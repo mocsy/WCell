@@ -45,6 +45,7 @@ using WCell.Util.Graphics;
 using WCell.Util.NLog;
 using WCell.Constants.Chat;
 
+
 namespace WCell.RealmServer.Entities
 {
 	/// <summary>
@@ -1564,6 +1565,11 @@ namespace WCell.RealmServer.Entities
 		public List<IProcHandler> ProcHandlers
 		{
 			get { return m_procHandlers; }
+		}
+
+		public void AddProcHandler(ProcHandlerTemplate templ)
+		{
+			AddProcHandler(new ProcHandler(this, this, templ));
 		}
 
 		public void AddProcHandler(IProcHandler handler)
