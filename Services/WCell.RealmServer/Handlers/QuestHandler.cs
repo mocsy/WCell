@@ -73,6 +73,64 @@ namespace WCell.RealmServer.Handlers
 			}
 		}
 
+        /// <summary>
+		/// Handles the quest position of interest query.
+		/// </summary>
+		/// <param name="client">The client.</param>
+		/// <param name="packet">The packet.</param>
+		[ClientPacketHandler(RealmServerOpCode.CMSG_QUEST_POI_QUERY)]
+        public static void HandleQuestPOIQuery(IRealmClient client, RealmPacketIn packet)
+        {
+            uint count = packet.ReadUInt32();
+            var questIds = new List<uint>();
+            for(var i = 0; i < count; i++)
+                questIds.Add(packet.ReadUInt32());
+            SendQuestPOIResponse(client, count, questIds);
+        }
+
+        public static void SendQuestPOIResponse(IRealmClient client, uint count, IEnumerable<uint> questIds)
+        {
+            using (var packet = new RealmPacketOut(RealmServerOpCode.SMSG_QUEST_POI_QUERY_RESPONSE))
+            {
+                packet.Write(count);
+                foreach (var questId in questIds)
+                {
+                    List<QuestPOI> poiList;
+                    QuestMgr.POIs.TryGetValue(questId, out poiList);
+                    if (poiList != null)
+                    {
+                        packet.Write(questId);                  // quest ID
+                        packet.Write((uint)poiList.Count);      // POI count
+
+                        foreach (var poi in poiList)
+                        {
+                            packet.Write(poi.PoiId);            // POI index
+                            packet.Write(poi.ObjectiveIndex);   // objective index
+                            packet.Write((uint) poi.MapID);     // mapid
+                            packet.Write((uint) poi.ZoneId);    // world map area id
+                            packet.Write(poi.FloorId);          // floor id
+                            packet.Write(poi.Unk3);             // unknown
+                            packet.Write(poi.Unk4);             // unknown
+                            packet.Write((uint)poi.Points.Count); // POI points count
+
+                            foreach (var questPOIPoints in poi.Points)
+                            {
+                                packet.Write(questPOIPoints.X); // POI point x
+                                packet.Write(questPOIPoints.Y); // POI point y
+                            }
+                        }
+                    }
+                    else
+                    {
+                        packet.Write(questId); // quest ID
+                        packet.Write(0u); // POI count
+                    }
+                }
+
+                client.Send(packet);
+            }
+        }
+
 		/// <summary>
 		/// Handles the quest giver cancel.
 		/// </summary>
@@ -487,13 +545,12 @@ namespace WCell.RealmServer.Handlers
 		/// <param name="acceptable">if set to <c>true</c> [acceptable].</param>
 		public static void SendDetails(IEntity questGiver, QuestTemplate qt, Character chr, bool acceptable)
 		{
-
 			var locale = chr.Locale;
 			using (var pckt = new RealmPacketOut(RealmServerOpCode.SMSG_QUESTGIVER_QUEST_DETAILS))
 			{
 				pckt.Write(questGiver != null ? questGiver.EntityId : EntityId.Zero);
 
-				pckt.Write(EntityId.Zero);		// unknown, wotlk, quest sharing?
+				pckt.Write(EntityId.Zero);						// unknown, wotlk, quest sharing?
 
 				pckt.Write(qt.Id);
 
@@ -508,10 +565,10 @@ namespace WCell.RealmServer.Handlers
 				pckt.Write((byte)0); // probably some pvp flag
 				if (qt.Flags.HasFlag(QuestFlags.HiddenRewards))
 				{
-					pckt.WriteUInt(0u);
-					pckt.WriteUInt(0u);
-					pckt.WriteUInt(0u);
-					pckt.WriteUInt(0u);
+					pckt.WriteUInt(0u);		// choice items length
+					pckt.WriteUInt(0u);		// reward items length
+					pckt.WriteUInt(0u);		// money
+					pckt.WriteUInt(0u);		// xp
 				}
 				else
 				{
@@ -547,18 +604,19 @@ namespace WCell.RealmServer.Handlers
 							pckt.Write(0);
 						}
 					}
+
+					if (chr.Level >= RealmServerConfiguration.MaxCharacterLevel)
+					{
+						pckt.Write(qt.MoneyAtMaxLevel);
+					}
+					else
+					{
+						pckt.Write(qt.RewMoney);
+					}
+
+					pckt.Write(qt.CalcRewardXp(chr));						// since 3.3
 				}
 
-				if (chr.Level >= RealmServerConfiguration.MaxCharacterLevel)
-				{
-					pckt.Write(qt.MoneyAtMaxLevel);
-				}
-				else
-				{
-					pckt.Write(qt.RewMoney);
-				}
-
-				pckt.Write(qt.CalcRewardXp(chr));						// since 3.3
 				pckt.Write(qt.RewHonorAddition);
 				pckt.Write(qt.RewHonorMultiplier);						// since 3.3
 				pckt.Write((uint)qt.RewSpell);
@@ -570,11 +628,17 @@ namespace WCell.RealmServer.Handlers
 				pckt.Write(0);						// bonus arena points
 				pckt.Write(0);
 				for (uint i = 0; i < QuestConstants.MaxReputations; ++i)
-					pckt.Write((uint)qt.RewardReputations[i].Faction);
+				{
+					pckt.Write((uint) qt.RewardReputations[i].Faction);
+				}
 				for (uint i = 0; i < QuestConstants.MaxReputations; ++i)
+				{
 					pckt.Write(qt.RewardReputations[i].ValueId);
+				}
 				for (uint i = 0; i < QuestConstants.MaxReputations; ++i)
+				{
 					pckt.Write(qt.RewardReputations[i].Value);
+				}
 
 				pckt.Write(QuestConstants.MaxEmotes);
 				for (var i = 0; i < QuestConstants.MaxEmotes; i++)
@@ -951,12 +1015,12 @@ namespace WCell.RealmServer.Handlers
 				//var qs = qt.GetStartStatus(qHolder.QuestHolderInfo, client.ActiveCharacter);
 				if (!chr.QuestLog.HasActiveQuest(questid))
 				{
-					//var autoAccept = qt.Flags.HasFlag(QuestFlags.AutoAccept);
-					SendDetails(qHolder, qt, chr, true);
-					//if (autoAccept)
-					//{
-					//    chr.QuestLog.TryAddQuest(qt, qHolder);
-					//}
+					var autoAccept = qt.Flags.HasFlag(QuestFlags.AutoAccept);
+                    SendDetails(qHolder, qt, chr, !autoAccept);
+                    if (autoAccept)
+                    {
+                        chr.QuestLog.TryAddQuest(qt, qHolder);
+                    }
 				}
 				else
 				{

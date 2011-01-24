@@ -130,6 +130,10 @@ namespace WCell.RealmServer.Quests
 		{
 			return id < Templates.Length ? Templates[id] : null;
 		}
+
+
+        public static Dictionary<uint, List<QuestPOI>> POIs = new Dictionary<uint, List<QuestPOI>>();
+
 		#endregion
 
 		#region Quest initialization and loading
@@ -155,7 +159,10 @@ namespace WCell.RealmServer.Quests
 				Templates = new QuestTemplate[30000];
 
 				ContentMgr.Load<QuestTemplate>();
+                ContentMgr.Load<QuestPOI>();
+                ContentMgr.Load<QuestPOIPoints>();
 				CreateQuestRelationGraph();
+				Loaded = true;
 
 				EnsureCharacterQuestsLoaded();
 				AddSpellCastObjectives();
@@ -300,7 +307,7 @@ namespace WCell.RealmServer.Quests
 								{
 									if (chr.IsInWorld)
 									{
-										chr.InitQuests();
+										chr.LoadQuests();
 									}
 								});
 			}
@@ -389,12 +396,12 @@ namespace WCell.RealmServer.Quests
 				if (list.Count == 1 && !chr.QuestLog.HasActiveQuest(list[0].Id))
 				{
 					// start a single quest if there is only one and the user did not start it yet
-					//var autoAccept = list[0].Flags.HasFlag(QuestFlags.AutoAccept);
-					QuestHandler.SendDetails(qHolder, list[0], chr, true);
-					//if (autoAccept)
-					//{
-					//    chr.QuestLog.TryAddQuest(list[0], qHolder);
-					//}
+					var autoAccept = list[0].Flags.HasFlag(QuestFlags.AutoAccept);
+					QuestHandler.SendDetails(qHolder, list[0], chr, !autoAccept);
+					if (autoAccept)
+					{
+					    chr.QuestLog.TryAddQuest(list[0], qHolder);
+					}
 				}
 				else
 				{
