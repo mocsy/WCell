@@ -1,5 +1,8 @@
 using WCell.Constants;
+using WCell.Constants.Battlegrounds;
 using WCell.Constants.GameObjects;
+using WCell.Constants.World;
+using WCell.Addons.Default.Lang;
 using WCell.RealmServer.GameObjects;
 
 namespace WCell.Addons.Default.Battlegrounds.ArathiBasin.Bases
@@ -7,58 +10,35 @@ namespace WCell.Addons.Default.Battlegrounds.ArathiBasin.Bases
     class Farm : ArathiBase
     {
         public Farm(ArathiBasin instance)
-            : base(instance, null)
+            : base(instance)
         {
+            showIconNeutral = WorldStateId.ABShowFarmIcon;
+            showIconAllianceContested = WorldStateId.ABShowFarmIconAllianceContested;
+            showIconAllianceControlled = WorldStateId.ABShowFarmIconAlliance;
+            showIconHordeContested = WorldStateId.ABShowFarmIconHordeContested;
+            showIconHordeControlled = WorldStateId.ABShowFarmIconHorde;
+
+            Names = DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.ABFarm);
+        }
+
+        protected override void AddSpawns()
+        {
+            neutralBannerSpawn = GOMgr.GetEntry(GOEntryId.FarmBanner_2).FirstSpawnEntry;
+            neutralAuraSpawn = GOMgr.GetEntry(GOEntryId.NeutralBannerAura).SpawnEntries[(int)ArathiBases.Farm];
+
+            allianceBannerSpawn = GOMgr.GetEntry(GOEntryId.AllianceBanner_10).SpawnEntries[(int)ArathiBases.Farm];
+            allianceAuraSpawn = GOMgr.GetEntry(GOEntryId.AllianceBannerAura).SpawnEntries[(int)ArathiBases.Farm];
+
+            hordeBannerSpawn = GOMgr.GetEntry(GOEntryId.HordeBanner_10).SpawnEntries[(int)ArathiBases.Farm];
+            hordeAuraSpawn = GOMgr.GetEntry(GOEntryId.HordeBannerAura).SpawnEntries[(int)ArathiBases.Farm];
+
+            allianceAttackBannerSpawn = GOMgr.GetEntry(GOEntryId.ContestedBanner_26).SpawnEntries[(int)ArathiBases.Farm];
+            hordeAttackBannerSpawn = GOMgr.GetEntry(GOEntryId.ContestedBanner_25).SpawnEntries[(int)ArathiBases.Farm];
         }
 
         public override string BaseName
         {
             get { return "Farm"; }
-        }
-
-        protected override void SpawnNeutral()
-        {
-            GOEntry farmBannerEntry = GOMgr.GetEntry(GOEntryId.FarmBanner_2);
-            FlagStand = farmBannerEntry.FirstSpawnEntry.Spawn(Instance);
-
-            GOEntry neutralBannerAuraEntry = GOMgr.GetEntry(GOEntryId.NeutralBannerAura);
-            ActualAura = neutralBannerAuraEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
-        }
-
-        protected override void SpawnAlliance()
-        {
-            GOEntry allianceControlledFlagEntry = GOMgr.GetEntry(GOEntryId.AllianceBanner_10);
-            FlagStand = allianceControlledFlagEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
-
-            GOEntry allianceBannerAuraEntry = GOMgr.GetEntry(GOEntryId.AllianceBannerAura);
-            ActualAura = allianceBannerAuraEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
-        }
-
-        protected override void SpawnHorde()
-        {
-            GOEntry hordeControlledFlagEntry = GOMgr.GetEntry(GOEntryId.HordeBanner_10);
-            FlagStand = hordeControlledFlagEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
-
-            GOEntry hordeBannerAuraEntry = GOMgr.GetEntry(GOEntryId.HordeBannerAura);
-            ActualAura = hordeBannerAuraEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
-        }
-
-        protected override void SpawnContested()
-        {
-            if (Capturer.Battlegrounds.Team.Side == BattlegroundSide.Horde)
-            {
-                GOEntry hordeAttackFlagEntry = GOMgr.GetEntry(GOEntryId.ContestedBanner_25);
-                FlagStand = hordeAttackFlagEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
-            }
-            else
-            {
-                GOEntry allianceAttackFlagEntry = GOMgr.GetEntry(GOEntryId.ContestedBanner_26);
-                FlagStand = allianceAttackFlagEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
-            }
-
-            // don't know if we have to spawn neutral aura...
-            GOEntry neutralBannerAuraEntry = GOMgr.GetEntry(GOEntryId.NeutralBannerAura);
-            neutralBannerAuraEntry.SpawnEntries[(int)ArathiBases.Farm].Spawn(Instance);
         }
     }
 }
