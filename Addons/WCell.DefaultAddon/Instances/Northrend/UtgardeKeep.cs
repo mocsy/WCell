@@ -5,6 +5,7 @@ using WCell.Constants.NPCs;
 using WCell.Core.Initialization;
 using WCell.Core.Timers;
 using WCell.RealmServer.AI.Brains;
+using WCell.RealmServer.AI.Groups;
 using WCell.RealmServer.GameObjects;
 using WCell.RealmServer.Instances;
 using WCell.RealmServer.NPCs;
@@ -29,10 +30,11 @@ namespace WCell.Addons.Default.Instances
 {
 	public class UtgardeKeep : DungeonInstance
 	{
+		#region Static Settings
 		private static NPCEntry princeKelesethEntry;
 		public const int PrinceSkeletonCount = 5;
 		internal static NPCEntry PrinceSkeletonEntry;
-		private static readonly Vector3[] PrinceSkeletonPositions = new []
+		private static readonly Vector3[] PrinceSkeletonPositions = new[]
         { 
             new Vector3(156.2559f, 259.2093f, 42.8668f),
             new Vector3(156.2559f, 259.2093f, 42.8668f),
@@ -40,9 +42,17 @@ namespace WCell.Addons.Default.Instances
             new Vector3(156.2559f, 259.2093f, 42.8668f),
             new Vector3(156.2559f, 259.2093f, 42.8668f)
         };
-
+		private static readonly NPCSpawnEntry[] PrinceSkeletonSpawnEntries = new NPCSpawnEntry[PrinceSkeletonCount];
 		private static NPCEntry dragonflayerIronhelm;
+		#endregion
 
+		/// <summary>
+		/// Instance of currently active prince.
+		/// Will be unset when prince leaves world, so we don't need any IsInWorld checks!
+		/// </summary>
+		private NPC PrinceKeleseth;
+		private int PrinceDeadSkeletonCount = 0;
+		private readonly NPC[] PrinceDeadSkeletons = new NPC[PrinceSkeletonCount];
 
 		#region Setup Content
 		[Initialization]
@@ -55,6 +65,7 @@ namespace WCell.Addons.Default.Instances
 			dragonflayerIronhelm.AddSpell(SpellId.HeroicStrike_9);
 			SpellHandler.Apply(spell => { spell.CooldownTime = 5000; },
 				SpellId.HeroicStrike_9);
+
 
 			//Prince Keleseth
 			SetupPrinceKeleseth();
@@ -72,6 +83,78 @@ namespace WCell.Addons.Default.Instances
 
 
 		#region Prince Keleseth
+		/// <summary>
+		/// Returns the index of the given skeleton for the skeleton arrays
+		/// </summary>
+		static int GetSkeletonIndex(NPC skel)
+		{
+			if (skel.SpawnPoint == null)
+			{
+				// unrelated Skeleton
+				return -1;
+			}
+
+			for (var i = 0; i < PrinceSkeletonSpawnEntries.Length; i++)
+			{
+				var spawn = PrinceSkeletonSpawnEntries[i];
+				if (spawn == skel.SpawnPoint.SpawnEntry)
+				{
+					return i;
+				}
+			}
+
+			// unrelated Skeleton
+			return -1;
+		}
+
+		/// <summary>
+		/// Returns the skeleton with the given index
+		/// </summary>
+		NPC GetSkeleton(int index)
+		{
+			// first check for dead skeleton
+			var skel = PrinceDeadSkeletons[index];
+			if (skel != null)
+			{
+				return skel;
+			}
+
+			// check in Prince' AIGroup
+			if (PrinceKeleseth == null) return null;
+			var spawn = PrinceSkeletonSpawnEntries[index];
+
+			// return matching Skeleton
+			return PrinceKeleseth.Group.FirstOrDefault(npc => npc.SpawnPoint.SpawnEntry == spawn);
+		}
+
+		/// <summary>
+		/// Maintain array of dead skeletons when something happens to a skeleton.
+		/// AIGroup is managed automagically by the pool system
+		/// </summary>
+		static void UpdateSkeleton(NPC skel)
+		{
+			var instance = skel.Map as UtgardeKeep;
+			if (instance == null) return;
+
+			var index = GetSkeletonIndex(skel);
+			if (index >= 0)
+			{
+				if (skel.IsAlive || skel.IsDeleted)
+				{
+					// skeleton is resurrected or deleted
+					// remove from list of dead skeletons
+					--instance.PrinceDeadSkeletonCount;
+					instance.PrinceDeadSkeletons[index] = null;
+				}
+				else
+				{
+					// Skeleton has been killed
+					// add to list of dead skeletons
+					++instance.PrinceDeadSkeletonCount;
+					instance.PrinceDeadSkeletons[index] = skel;
+				}
+			}
+		}
 
 		private static void SetupPrinceKeleseth()
 		{
@@ -84,26 +167,65 @@ namespace WCell.Addons.Default.Instances
 			PrinceSkeletonEntry.AddSpell(SpellId.Decrepify);
 			SpellHandler.Apply(spell => { spell.CooldownTime = 5000; }, SpellId.Decrepify);
 
-			// add the dead skeletons to the prince' SpawnPool
 			var princeSpawnEntry = princeKelesethEntry.SpawnEntries[0];
+			var poolTemplate = princeSpawnEntry.PoolTemplate;
 
+			// do not let Skeletons decay
+			PrinceSkeletonEntry.DefaultDecayDelayMillis = 0;
+
+			// add skeleton spawn entries to pool
 			for (var i = 0; i < PrinceSkeletonCount; i++)
 			{
 				var skelSpawnEntry = new NPCSpawnEntry(PrinceSkeletonEntry.NPCId, MapId.UtgardeKeep, PrinceSkeletonPositions[i])
 				{
-					IsDead = true
+					AutoSpawns = true,						// need to manage spawning ourselves
+					IsDead = true,							// spawn dead
+					PoolId = poolTemplate.PoolId			// share Prince' pool
 				};
-				skelSpawnEntry.FinalizeDataHolder(false);
+				skelSpawnEntry.FinalizeDataHolder();		// adds to PoolTemplate automatically
 
-				princeSpawnEntry.PoolTemplate.AddEntry(skelSpawnEntry);
+				PrinceSkeletonSpawnEntries[i] = skelSpawnEntry;
 			}
 
-
 			// give the prince his AttackAction
-			princeKelesethEntry.Activated += princeKeleseth =>
+			princeKelesethEntry.Activated += prince =>
 			{
-				((BaseBrain)princeKeleseth.Brain).DefaultCombatAction.Strategy = new PrinceKelesethAttackAction(princeKeleseth);
+				var instance = prince.Map as UtgardeKeep;
+				if (instance == null) return;
+
+				((BaseBrain)prince.Brain).DefaultCombatAction.Strategy = new PrinceKelesethAttackAction(prince);
+
+				instance.SpawnDeadPrinceSkeletons(prince);
 			};
+
+			// prince deleted
+			princeKelesethEntry.Deleted += prince =>
+			{
+				var instance = prince.Map as UtgardeKeep;
+				if (instance == null) return;
+
+				// add this "if", in case a GM spawns more than one prince
+				if (instance.PrinceKeleseth == prince)
+				{
+					// unset PrinceKeleseth object
+					instance.PrinceKeleseth = null;
+				}
+			};
+
+			// prince dies
+			princeKelesethEntry.Died += prince =>
+			{
+				var instance = prince.Map as UtgardeKeep;
+				if (instance == null) return;
+
+				// kill all skeletons
+				instance.KillPrinceSkeletons();
+			};
+
+			// update Skeleton if it dies/lives or gets deleted
+			PrinceSkeletonEntry.Activated += UpdateSkeleton;
+			PrinceSkeletonEntry.Died += UpdateSkeleton;
+			PrinceSkeletonEntry.Deleted += UpdateSkeleton;
 
 			princeKelesethEntry.AddSpell(SpellId.ShadowBolt_73);
 			SpellHandler.Apply(spell => { spell.CooldownTime = 10000; },
@@ -126,9 +248,56 @@ namespace WCell.Addons.Default.Instances
 
 		}
 
+		#region Handle Skeleton group
+		/// <summary>
+		/// Make sure, skeletons are all dead
+		/// </summary>
+		private void KillPrinceSkeletons()
+		{
+			if (PrinceKeleseth == null) return;
+
+			foreach (var mob in PrinceKeleseth.Group)
+			{
+				if (mob != PrinceKeleseth)
+				{
+					mob.Kill();
+				}
+			}
+		}
+
+		/// <summary>
+		/// Spawn the dead skeletons (if any are missing or happen to be alive)
+		/// </summary>
+		void SpawnDeadPrinceSkeletons(NPC prince)
+		{
+			// set this prince to be the one prince of the instance
+			PrinceKeleseth = prince;
+
+			// make Prince leader of group
+			PrinceKeleseth.Group.Leader = PrinceKeleseth;
+
+			// spawn missing skeletons and add them to array of dead skeletons
+			for (var i = 0; i < PrinceSkeletonSpawnEntries.Length; i++)
+			{
+				// check if skeleton still exists, else, respawn it
+				var skel = GetSkeleton(i);
+				if (skel == null)
+				{
+					var spawn = PrinceSkeletonSpawnEntries[i];
+					skel = spawn.SpawnObject(this);
+				}
+
+				if (skel.IsAlive)
+				{
+					// make sure Skeleton is dead
+					skel.Kill();
+				}
+			}
+		}
+		#endregion
+
 		public class PrinceKelesethBrain : MobBrain
 		{
-
 			const string TEXT_AGGRO = "Your blood is mine!";
 			const string TEXT_SUMMONING_SKELETOMS = "Aranal, ledel! Their fate shall be yours!";
 			const string TEXT_FROSTTOMB = "Not so fast.";
@@ -184,11 +353,7 @@ namespace WCell.Addons.Default.Instances
 			public override void Start()
 			{
 				// Revive the Skeletons
-				foreach (var mob in Skeletons)
-				{
-					// resurrect skeleton
-					m_owner.SpellCast.Trigger(SpellId.SoulstoneResurrection_7, mob);
-				}
+				ResurrectSkeletons();
 
 				// Cheking if Vrykul Skeleton is death
 				// if all Skeleton is death ress all
@@ -227,10 +392,16 @@ namespace WCell.Addons.Default.Instances
 					return;
 				}
 
+				ResurrectSkeletons();
+			}
+
+			void ResurrectSkeletons()
+			{
 				foreach (var mob in Skeletons)
 				{
 					// resurrect skeleton
 					m_owner.SpellCast.Trigger(SpellId.SoulstoneResurrection_7, mob);
+					//mob.HealthPct = 100;
 				}
 			}
 		}
@@ -283,6 +454,13 @@ namespace WCell.Addons.Default.Instances
 
 		#endregion
 
+		#endregion
+
+		#region Overrides
+		protected override void SpawnNPCs()
+		{
+			base.SpawnNPCs();
+		}
 		#endregion
 
 	}
