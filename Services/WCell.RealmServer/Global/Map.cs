@@ -820,14 +820,19 @@ namespace WCell.RealmServer.Global
 			get { return m_gosSpawned; }
 		}
 
-		public NPCSpawnPool AddNPCSpawnPool(NPCSpawnPoolTemplate templ)
+		public void AddNPCSpawnPoolLater(NPCSpawnPoolTemplate templ)
+		{
+			AddMessage(() => AddNPCSpawnPoolNow(templ));
+		}
+
+		public NPCSpawnPool AddNPCSpawnPoolNow(NPCSpawnPoolTemplate templ)
 		{
 			var pool = new NPCSpawnPool(this, templ);
-			AddNPCSpawnPool(pool);
+			AddNPCSpawnPoolNow(pool);
 			return pool;
 		}
 
-		public void AddNPCSpawnPool(NPCSpawnPool pool)
+		public void AddNPCSpawnPoolNow(NPCSpawnPool pool)
 		{
 			if (!m_npcSpawnPools.ContainsKey(pool.Template.PoolId))
 			{
@@ -918,12 +923,16 @@ namespace WCell.RealmServer.Global
 			{
 				pool.RemovePoolNow();
 			}
+			foreach (var pool in m_goSpawnPools.Values.ToArray())
+			{
+				pool.RemovePoolNow();
+			}
 
 			var objs = CopyObjects();
 			for (var i = 0; i < objs.Length; i++)
 			{
 				var obj = objs[i];
-				if (!(obj is Character) && (!(obj is Unit) || obj.IsOwnedByPlayer))
+				if (!(obj is Character) && !obj.IsOwnedByPlayer)
 				{
 					// only delete things that are not Characters or belong to Characters
 					obj.DeleteNow();
@@ -1032,9 +1041,9 @@ namespace WCell.RealmServer.Global
 			{
 				foreach (var templ in poolTemplates)
 				{
-					if (templ.AutoSpawns && IsEventActive(templ.Entries[0].EventId))
+					if (templ.AutoSpawns && IsEventActive(templ.EventId))
 					{
-						AddNPCSpawnPool(templ);
+						AddNPCSpawnPoolNow(templ);
 					}
 				}
 			}
@@ -2253,7 +2262,6 @@ namespace WCell.RealmServer.Global
 					});
 
 					AddMessage(addTask);
-					obj.Map = this;
 				}
 			}
 

@@ -1,5 +1,2 @@
-- integrated GOs into the new spawn system - GOs respawn now correctly!
-- fixed proc checks for specific sets of proc spells
-- add spawned minions to same AIGroup as boss
-- added all UDB-data defining XML files into the new Content solution folder
-- #tele command will not show a selection anymore if one types the *exact* name of the target location
+- added aggro on debuff
+- added support for quests with spellcast objectives (fixes Thirst Unending for belfs amongst others)
