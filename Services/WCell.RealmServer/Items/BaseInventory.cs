@@ -452,60 +452,6 @@ namespace WCell.RealmServer.Items
 		public abstract PlayerInventory OwnerInventory { get; }
 
 		/// <summary>
-		/// Checks for whether the given amount of that Item can still be added 
-		/// (due to max unique count).
-		/// </summary>
-		/// <param name="mountItem"></param>
-		/// <returns></returns>
-		internal InventoryError CheckEquipCount(IMountableItem mountItem)
-		{
-			var templ = mountItem.Template;
-			if (templ.Flags.HasFlag(ItemFlags.UniqueEquipped))
-			{
-				// may only equip a certain maximum of this item
-				foreach (var slot in templ.EquipmentSlots)
-				{
-					var item = m_Items[(uint)slot];
-					if (item != null && item.Template.Id == templ.Id)
-					{
-						return InventoryError.ITEM_UNIQUE_EQUIPABLE;
-					}
-				}
-			}
-
-			// also check for unique gems
-			if (mountItem.Enchantments != null)
-			{
-				for (var i = EnchantSlot.Socket1; i < EnchantSlot.Socket1 + ItemConstants.MaxSocketCount; i++)
-				{
-					var enchant = mountItem.Enchantments[(uint)i];
-					if (enchant != null && !CheckEquippedGems(enchant.Entry.GemTemplate))
-					{
-						return InventoryError.ITEM_UNIQUE_EQUIPPABLE_SOCKETED;
-					}
-				}
-			}
-			return InventoryError.OK;
-		}
-
-		internal bool CheckEquippedGems(ItemTemplate gemTempl)
-		{
-			if (gemTempl != null && gemTempl.Flags.HasFlag(ItemFlags.UniqueEquipped))
-			{
-				// may only equip a certain maximum of this kind of gem
-				for (var slot = EquipmentSlot.Head; slot < EquipmentSlot.Bag1; slot++)
-				{
-					var item = m_Items[(uint)slot];
-					if (item != null && item.HasGem(gemTempl.ItemId))
-					{
-						return false;
-					}
-				}
-			}
-			return true;
-		}
-
-		/// <summary>
 		/// Is called before adding the given amount of the given Item. 
 		/// </summary>
 		/// <param name="item"></param>
@@ -1004,46 +950,53 @@ namespace WCell.RealmServer.Items
 
 		internal void AddLoadedItem(Item item)
 		{
-			if (this[item.Slot] != null)
+			try
 			{
-				// no idea why items get saved in the same slot
-				LogManager.GetCurrentClassLogger().Warn("Ignoring Item {0} for {1} because slot is already occupied by: {2}", item, Owner, this[item.Slot]);
-				item.Destroy();
-				return;
-			}
-
-			var owner = Owner;
-			var record = item.Record;
-			var inv = OwnerInventory;
-			inv.OnAmountChanged(item, (int)item.Amount);
-
-			// add enchants
-			// item.ApplyEnchant(item.Record.EnchantPerm, EnchantSlot.Permanent, 0, 0);
-			// item.ApplyEnchant(item.Record.EnchantTemp, EnchantSlot.Temporary, (uint)item.Record.EnchantTempTime, 0);
-			// item.ApplyEnchant(item.Record.EnchantSock1, EnchantSlot.Socket1, 0, 0);
-			// item.ApplyEnchant(item.Record.EnchantSock2, EnchantSlot.Socket2, 0, 0);
-			// item.ApplyEnchant(item.Record.EnchantSock3, EnchantSlot.Socket3, 0, 0);
-			if (record.EnchantIds != null)
-			{
-				for (var slot = 0; slot < record.EnchantIds.Length; slot++)
+				if (this[item.Slot] != null)
 				{
-					var enchant = record.EnchantIds[slot];
-					if (slot == (int)EnchantSlot.Temporary)
-					{
-						item.ApplyEnchant(enchant, (EnchantSlot)slot, record.EnchantTempTime, 0, false);
-					}
-					else
-					{
-						item.ApplyEnchant(enchant, (EnchantSlot)slot, 0, 0, false);
-					}
+					// no idea why items get saved in the same slot
+					LogManager.GetCurrentClassLogger().Warn("Ignoring Item {0} for {1} because slot is already occupied by: {2}", item,
+															Owner, this[item.Slot]);
+					item.Destroy();
+					return;
 				}
-				//item.CheckSocketColors();
+
+				var owner = Owner;
+				var record = item.Record;
+				var inv = OwnerInventory;
+
+				// add enchants
+				// item.ApplyEnchant(item.Record.EnchantPerm, EnchantSlot.Permanent, 0, 0);
+				// item.ApplyEnchant(item.Record.EnchantTemp, EnchantSlot.Temporary, (uint)item.Record.EnchantTempTime, 0);
+				// item.ApplyEnchant(item.Record.EnchantSock1, EnchantSlot.Socket1, 0, 0);
+				// item.ApplyEnchant(item.Record.EnchantSock2, EnchantSlot.Socket2, 0, 0);
+				// item.ApplyEnchant(item.Record.EnchantSock3, EnchantSlot.Socket3, 0, 0);
+				if (record.EnchantIds != null)
+				{
+					for (var slot = 0; slot < record.EnchantIds.Length; slot++)
+					{
+						var enchant = record.EnchantIds[slot];
+						if (slot == (int)EnchantSlot.Temporary)
+						{
+							item.ApplyEnchant(enchant, (EnchantSlot)slot, record.EnchantTempTime, 0, false);
+						}
+						else
+						{
+							item.ApplyEnchant(enchant, (EnchantSlot)slot, 0, 0, false);
+						}
+					}
+					//item.CheckSocketColors();
+				}
+
+				this[item.Slot] = item;
+
+				owner.AddItemToUpdate(item);
+				inv.OnAddDontNotify(item);
 			}
-
-			this[item.Slot] = item;
-
-			owner.AddItemToUpdate(item);
-			inv.OnAddDontNotify(item);
+			catch (Exception e)
+			{
+				LogUtil.ErrorException(e, "Unable to add Item \"{0}\" to Container: {1}", item);
+			}
 		}
 
 		public Item Remove(InventorySlot slot, bool ownerChange)
@@ -1406,6 +1359,11 @@ namespace WCell.RealmServer.Items
 		IEnumerator IEnumerable.GetEnumerator()
 		{
 			return GetEnumerator();
+		}
+
+		public override string ToString()
+		{
+			return "";
 		}
 	}
 }
