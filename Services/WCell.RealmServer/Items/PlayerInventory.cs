@@ -182,7 +182,6 @@ namespace WCell.RealmServer.Items
 					if (value != null)
 					{
 						m_owner.SetUInt32(PlayerFields.AMMO_ID, value.Template.Id);
-						value.Slot = (int)InventorySlot.Invalid;
 						value.OnEquip();
 					}
 					m_ammo = value;
@@ -347,11 +346,6 @@ namespace WCell.RealmServer.Items
 		}
 		#endregion
 
-		IItemSlotHandler GetHandlerForItemOrAmmo(int slot)
-		{
-			return slot == -1 ? Equipment : GetHandler(slot);
-		}
-
 		/// <summary>
 		/// Returns the IItemSlotHandler for the specified InventorySlot
 		/// </summary>
@@ -486,42 +480,6 @@ namespace WCell.RealmServer.Items
 		}
 
 		#region Adding
-		/// <summary>
-		/// Tries to add a new item with the given template and amount ot the given slot.
-		/// Make sure the given targetSlot is valid before calling this method.
-		/// If slot is occupied, method will find another unoccupied slot.
-		/// </summary>
-		/// <returns>The result (InventoryError.OK in case that it worked)</returns>
-		public InventoryError TryAdd(ItemId id, ref int amount, InventorySlot targetSlot)
-		{
-			var templ = ItemMgr.GetTemplate(id);
-			if (templ != null)
-			{
-				return TryAdd(templ, ref amount, (int)targetSlot, true);
-			}
-			return InventoryError.Invalid;
-		}
-
-		/// <summary>
-		/// Tries to add ONE new item with the given template to the given slot.
-		/// Make sure the given targetSlot is valid before calling this method.
-		/// </summary>
-		public InventoryError TryAdd(ItemTemplate template, InventorySlot targetSlot)
-		{
-			var amount = 1;
-			return TryAdd(template, ref amount, (int)targetSlot, true);
-		}
-
-		/// <summary>
-		/// Tries to add a single new item with the given template to the given slot.
-		/// Make sure the given targetSlot is valid before calling this method.
-		/// </summary>
-		public InventoryError TryAdd(ItemTemplate template, EquipmentSlot targetSlot)
-		{
-			var amount = 1;
-			return TryAdd(template, ref amount, (int)targetSlot, true);
-		}
-
 		/// <summary>
 		/// 
 		/// </summary>
@@ -669,14 +627,17 @@ namespace WCell.RealmServer.Items
 		#endregion
 
 		#region Searching
+		public override int FindFreeSlot()
+		{
+			return BackPack.FindFreeSlot();
+		}
 
 		/// <summary>
 		/// Gets a free slot in the backpack (use FindFreeSlot(IMountableItem, uint) to also look through equipped bags and optionally the bank)
 		/// </summary>
 		public override int FindFreeSlot(int offset, int end)
 		{
-			var slot = BackPack.FindFreeSlot();
-			return slot;
+			return BackPack.FindFreeSlot();
 		}
 
 		/// <summary>
@@ -711,6 +672,11 @@ namespace WCell.RealmServer.Items
 			return FindFreeSlot(mountItem, amount, AutoEquipNewItems);
 		}
 
+		public SimpleSlotId FindFreeSlot(Item item, bool tryEquip)
+		{
+			return FindFreeSlot(item, item.Amount, tryEquip);
+		}
+
 		/// <summary>
 		/// Gets a free slot in a preferred equipped bag (eg Herb bag for Herbs) or backpack.
 		/// Looks for a suitable equipment slot first, if tryEquip is true
@@ -728,7 +694,7 @@ namespace WCell.RealmServer.Items
 					var item = this[slot];
 					if (item == null)
 					{
-						var handler = GetHandlerForItemOrAmmo(slot);
+						var handler = GetHandler(slot);
 						var err = InventoryError.OK;
 						handler.CheckAdd(slot, amount, templ, ref err);
 						if (err == InventoryError.OK)
@@ -973,6 +939,8 @@ namespace WCell.RealmServer.Items
 
 		public bool Iterate(InventorySlot[] slots, Func<Item, bool> validator)
 		{
+			Owner.EnsureContext();
+
 			var contLookup = ItemMgr.ContainerSlotsWithBank;
 
 			for (var i1 = 0; i1 < slots.Length; i1++)
@@ -1172,19 +1140,24 @@ namespace WCell.RealmServer.Items
 			var slotIdLists = new List<SimpleSlotId>[items.Length];				// the slots of the found items
 			var foundAmounts = new int[items.Length];
 			List<SimpleSlotId> slotIds;
+
+			// find all necessary items
 			for (var i = 0; i < items.Length; i++)
 			{
 				var template = items[i];
-				slotIdLists[i] = slotIds = new List<SimpleSlotId>();
+				slotIdLists[i] = slotIds = new List<SimpleSlotId>(3);
 
 				foundAmounts[i] = Find(inclBank, template.Amount, slotIds, item => item.Template.ItemId == template.ItemId);
 
 				if (foundAmounts[i] < template.Amount)
 				{
+					// one of the required items does not have a sufficient amount -> Cancel
 					return false;
 				}
 			}
 
+			// we made sure that we have enough of all items
+			// => Remove all of them
 			for (var i = 0; i < items.Length; i++)
 			{
 				var template = items[i];
@@ -1221,60 +1194,28 @@ namespace WCell.RealmServer.Items
 		/// <returns>The amount of found items</returns>
 		public int Find(bool inclBank, int max, IList<SimpleSlotId> list, Func<Item, bool> validator)
 		{
-			var slots = inclBank ? ItemMgr.InvSlotsWithBank : ItemMgr.StorageSlotsWithoutBank;
 			var found = 0;
 
-			var contLookup = ItemMgr.ContainerSlotsWithBank;
-
-			Item item;
-			foreach (int avlblSlot in slots)
+			Iterate(inclBank, item =>
 			{
-				item = m_Items[avlblSlot];
-				if (contLookup[avlblSlot])
-				{
-					var container = item as Container;
-					if (container != null)
-					{
-						var contInv = container.BaseInventory;
-						var contItems = contInv.Items;
-						for (var i = 0; i < contItems.Length; i++)
-						{
-							item = contItems[i];
-							if (item != null && validator(item))
-							{
-								found += item.Amount;
-								var slotId = new SimpleSlotId { Container = contInv, Slot = i };
-								list.Add(slotId);
-								if (found >= max)
-								{
-									return found;
-								}
-							}
-						}
-					}
-				}
-				else if (item != null && validator(item))
+				if (validator(item))
 				{
 					found += item.Amount;
-					var slotId = new SimpleSlotId
-					{
-						Container = this,
-						Slot = avlblSlot
-					};
+					var slotId = new SimpleSlotId { Container = item.Container, Slot = item.Slot };
 					list.Add(slotId);
 					if (found >= max)
 					{
-						return found;
+						return false;
 					}
 				}
-			}
+				return true;
+			});
 			return found;
 		}
 
 		/// <summary>
 		/// Returns the total amount of Items within this Inventory of the given ItemId
 		/// </summary>
-		/// <returns></returns>
 		public int GetAmount(ItemId id)
 		{
 			var amount = 0;
@@ -2627,9 +2568,19 @@ namespace WCell.RealmServer.Items
 		}
 		#endregion
 
-		public override string ToString()
+		public override IEnumerator<Item> GetEnumerator()
 		{
-			return "Inventory of " + Owner + ": " + this.ToArray().ToString(" / ");
+			foreach (var item in m_Items)
+			{
+				yield return item;
+				if (!item.IsContainer) continue;
+
+				var cont = ((Container)item).BaseInventory;
+				foreach (var bagItem in cont)
+				{
+					yield return bagItem;
+				}
+			}
 		}
 	}
 }

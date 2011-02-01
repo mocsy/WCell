@@ -5,6 +5,7 @@ using NLog;
 using WCell.Constants;
 using WCell.Constants.Misc;
 using WCell.Constants.Spells;
+using WCell.RealmServer.AI.Spells;
 using WCell.RealmServer.Entities;
 using WCell.RealmServer.Handlers;
 using WCell.RealmServer.Spells.Auras;
@@ -64,6 +65,7 @@ namespace WCell.RealmServer.Spells
 				}
 				h++;
 			}
+
 			//if (hasExtraEffects)
 			//{
 			//    foreach (var effect in extraEffects)
@@ -108,8 +110,7 @@ namespace WCell.RealmServer.Spells
 							var target = m_initialTargets[j];
 							if (target.IsInContext)
 							{
-								// must call ValidateTarget anyway
-								var err = handler.ValidateTarget(target);
+								var err = handler.ValidateAndInitializeTarget(target);
 								if (err != SpellFailedReason.Ok)
 								{
 									LogManager.GetCurrentClassLogger().Warn(
@@ -159,8 +160,16 @@ namespace WCell.RealmServer.Spells
 					}
 				}
 			}
-
 			return failReason;
+		}
+
+		SpellTargetCollection CreateSpellTargetCollection()
+		{
+			if (IsAICast)
+			{
+				return AISpellTargetCollection.ObtainAICollection();
+			}
+			return SpellTargetCollection.Obtain();
 		}
 
 		private void CreateHandler(SpellEffect effect, int h, SpellEffectHandler[] handlers, ref SpellTargetCollection targets, ref SpellFailedReason failReason)
@@ -182,40 +191,29 @@ namespace WCell.RealmServer.Spells
 				//targets = SpellTargetCollection.SpellTargetCollectionPool.Obtain();
 				if (targets == null)
 				{
-					targets = new SpellTargetCollection();
+					targets = CreateSpellTargetCollection();
 				}
 			}
 			else if (handler.HasOwnTargets)
 			{
 				// see if targets are shared between effects
-				if (IsPlayerCast && m_spell.AISpellCastSettings != null && m_spell.AISpellCastSettings.Target != AISpellCastTarget.Default)
+				targets = null;
+
+				for (var j = 0; j < h; j++)
 				{
-					// targets of all effects are determined by AI behavior
-					if (targets == null)
+					var handler2 = handlers[j];
+					if (handler.Effect.SharesTargets(handler2.Effect, IsAICast))
 					{
-						targets = SpellTargetCollection.Obtain();
+						// same targets -> share target collection
+						targets = handler2.m_targets;
+						break;
 					}
 				}
-				else
+
+				if (targets == null)
 				{
-					// check if we have same target-types, else collect targets specifically for this Effect
-					targets = null;
-
-					for (var j = 0; j < h; j++)
-					{
-						var handler2 = handlers[j];
-						if (handler.Effect.TargetsEqual(handler2.Effect))
-						{
-							targets = handler2.m_targets;
-							break;
-						}
-					}
-
-					if (targets == null)
-					{
-						//targets = SpellTargetCollection.SpellTargetCollectionPool.Obtain();
-						targets = SpellTargetCollection.Obtain();
-					}
+					//targets = SpellTargetCollection.SpellTargetCollectionPool.Obtain();
+					targets = CreateSpellTargetCollection();
 				}
 			}
 
@@ -243,7 +241,8 @@ namespace WCell.RealmServer.Spells
 			// Make sure that there is an Item for Spells that require an Item target
 			if (m_spell.TargetFlags.HasAnyFlag(SpellTargetFlags.Item))
 			{
-				if (UsedItem == null || !UsedItem.IsInWorld || UsedItem.Owner != CasterObject)
+				// Spell targets an item
+				if (TargetItem == null || !TargetItem.IsInWorld || TargetItem.Owner != CasterObject)
 				{
 					if (m_passiveCast)
 					{
@@ -251,44 +250,18 @@ namespace WCell.RealmServer.Spells
 					}
 					return SpellFailedReason.ItemNotFound;
 				}
-				if (UsedItem.IsEquipped && !UsedItem.Unequip())
+
+				if (TargetItem.IsEquipped && !TargetItem.Unequip())
 				{
 					if (m_passiveCast)
 					{
 						LogManager.GetCurrentClassLogger().Warn("Trying to trigger Spell without Item ready: " + this);
 					}
+
 					// make sure, Item is not equipped					
 					return SpellFailedReason.ItemNotReady;
 				}
 			}
-
-			if (!GodMode)
-			{
-				// check whether skill succeeded
-				if (CasterObject is Character &&
-					m_spell.Ability != null &&
-					m_spell.Ability.GreenValue > 0 &&
-					!m_spell.Ability.CheckSuccess(((Character)CasterObject).Skills.GetValue(m_spell.Ability.Skill.Id)))
-				{
-					return SpellFailedReason.TryAgain;
-				}
-
-				// consume reagents (last check, must not fail anymore after this one)
-				if (!ConsumeReagents())
-				{
-					return SpellFailedReason.Reagents;
-				}
-
-				if (Selected is ILockable && ((ILockable)Selected).Lock != null)
-				{
-					if (((ILockable)Selected).Lock.RequiresKneeling && CasterObject is Unit)
-					{
-						((Unit)CasterObject).StandState = StandState.Kneeling;
-					}
-				}
-			}
-
-			var isAutoShot = IsPlayerCast && m_spell.AttributesExB.HasFlag(SpellAttributesExB.AutoRepeat);
 
 			// check immunities
 			if (!IsAoE && Selected is Unit && !m_spell.IsPreventionDebuff)
@@ -301,32 +274,12 @@ namespace WCell.RealmServer.Spells
 				}
 			}
 
-			// check aura requirements
-			if (m_spell.IsAura)
-			{
-				if (m_targets.Count == 0 && !IsAoE && !m_spell.IsAreaAura)
-				{
-					return SpellFailedReason.NoValidTargets;
-				}
-				var failReason = PrepAuras();
-				if (failReason != SpellFailedReason.Ok)
-				{
-					Cancel(failReason);
-					return failReason;
-				}
-			}
-
-			// break stealth
-			if (CasterObject is Unit && !m_spell.AttributesEx.HasFlag(SpellAttributesEx.RemainStealthed))
-			{
-				((Unit)CasterObject).Auras.RemoveWhere(aura => aura.Spell.DispelType == DispelType.Stealth);
-			}
-
 			// toggle autoshot
 			if (CasterUnit != null)
 			{
-				if (isAutoShot)
+				if (m_spell.AttributesExB.HasFlag(SpellAttributesExB.AutoRepeat))
 				{
+					// autoshot
 					if (CasterUnit.Target == null)
 					{
 						CasterUnit.Target = Selected as Unit;
@@ -346,14 +299,14 @@ namespace WCell.RealmServer.Spells
 						// activate
 						CasterUnit.AutorepeatSpell = m_spell;
 						SendCastStart();
+						CasterUnit.IsFighting = true;
 					}
-					CasterUnit.IsFighting = true;
-					CasterUnit.IsInCombat = true;
 					return SpellFailedReason.DontReport;
 				}
 
 				else if (m_spell.Attributes.HasFlag(SpellAttributes.StopsAutoAttack))
 				{
+					// cancel autoshot
 					CasterUnit.AutorepeatSpell = null;
 					CasterUnit.IsFighting = false;
 				}
@@ -362,6 +315,58 @@ namespace WCell.RealmServer.Spells
 			{
 				// Channel requires CasterUnit
 				return SpellFailedReason.CasterAurastate;
+			}
+
+			// check aura stacking and prepare auras
+			if (m_spell.IsAura)
+			{
+				if (m_targets.Count == 0 && !IsAoE && !m_spell.IsAreaAura)
+				{
+					return SpellFailedReason.NoValidTargets;
+				}
+				var failReason = PrepAuras();
+				if (failReason != SpellFailedReason.Ok)
+				{
+					Cancel(failReason);
+					return failReason;
+				}
+			}
+
+			if (!GodMode && CasterUnit is Character)
+			{
+				// check whether skill succeeded
+				if (
+					m_spell.Ability != null &&
+					m_spell.Ability.GreenValue > 0 &&
+					!m_spell.Ability.CheckSuccess(((Character)CasterUnit).Skills.GetValue(m_spell.Ability.Skill.Id)))
+				{
+					return SpellFailedReason.TryAgain;
+				}
+
+				// consume reagents (last check -> must not fail anymore after this one)
+				if (!ConsumeReagents())
+				{
+					return SpellFailedReason.Reagents;
+				}
+			}
+			
+			// 
+			if (CasterUnit != null)
+			{
+				// we might have to kneel
+				if (Selected is ILockable && ((ILockable)Selected).Lock != null)
+				{
+					if (((ILockable)Selected).Lock.RequiresKneeling)
+					{
+						CasterUnit.StandState = StandState.Kneeling;
+					}
+				}
+				
+				// cancel stealth
+				if (!m_spell.AttributesEx.HasFlag(SpellAttributesEx.RemainStealthed))
+				{
+					CasterUnit.Auras.RemoveWhere(aura => aura.Spell.DispelType == DispelType.Stealth);
+				}
 			}
 
 			return SpellFailedReason.Ok;
@@ -757,9 +762,9 @@ namespace WCell.RealmServer.Spells
 			}
 
 			// Used an item
-			if (UsedItem != null)
+			if (TargetItem != null)
 			{
-				UsedItem.OnUse();
+				TargetItem.OnUse();
 			}
 
 			// update AuraState

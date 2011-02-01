@@ -163,7 +163,7 @@ namespace WCell.Addons.Default.Battlegrounds.WarsongGulch
 			{
 				CallDelayed(MaxDuration * 60, FinishFight);
 			}
-			Characters.SendMultiStringSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnStart));
+			Characters.SendSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnStart));
 		}
 
 		protected override void OnPrepareHalftime()
@@ -171,7 +171,7 @@ namespace WCell.Addons.Default.Battlegrounds.WarsongGulch
 			base.OnPrepareHalftime();
 
 			string time = RealmLocalizer.FormatTimeSecondsMinutes(PreparationTimeMillis / 2000);
-			Characters.SendMultiStringSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnPrepareHalfTime), time);
+			Characters.SendSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnPrepareHalfTime), time);
 		}
 
 
@@ -180,13 +180,13 @@ namespace WCell.Addons.Default.Battlegrounds.WarsongGulch
 			base.OnPrepare();
 
 			string time = RealmLocalizer.FormatTimeSecondsMinutes(PreparationTimeMillis / 1000);
-			Characters.SendMultiStringSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnPrepare), time);
+			Characters.SendSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnPrepare), time);
 		}
 
 		protected override void OnFinish(bool disposing)
 		{
 			base.OnFinish(disposing);
-            Characters.SendMultiStringSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnFinish), 
+            Characters.SendSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnFinish), 
                                                                                                         Winner.Side.ToString());
 		}
 
@@ -196,11 +196,11 @@ namespace WCell.Addons.Default.Battlegrounds.WarsongGulch
 		/// <param name="chr"></param>
 		protected override void OnLeave(Character chr)
 		{
-			chr.Auras.Cancel(SpellId.WarsongFlag);
-			chr.Auras.Cancel(SpellId.WarsongFlag_2);
-			chr.Auras.Cancel(SpellId.SilverwingFlag);
+			chr.Auras.Remove(SpellId.WarsongFlag);
+			chr.Auras.Remove(SpellId.WarsongFlag_2);
+			chr.Auras.Remove(SpellId.SilverwingFlag);
 
-			Characters.SendMultiStringSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnLeave), chr.Name);
+			Characters.SendSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnLeave), chr.Name);
 
 			base.OnLeave(chr);
 		}
@@ -213,7 +213,7 @@ namespace WCell.Addons.Default.Battlegrounds.WarsongGulch
 		{
 			base.OnEnter(chr);
 
-			Characters.SendMultiStringSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnEnter), chr.Name);
+			Characters.SendSystemMessage(DefaultAddonLocalizer.Instance.GetTranslations(AddonMsgKey.WSOnEnter), chr.Name);
 		}
 
 		protected override BattlegroundStats CreateStats()
@@ -487,10 +487,10 @@ namespace WCell.Addons.Default.Battlegrounds.WarsongGulch
 		public static void AddFlagEffectHandler()
 		{
 			Spell hordeFlagSpell = SpellHandler.Get(SpellId.WarsongFlag);
-			SpellEffect heffect = hordeFlagSpell.AddAuraEffect(() => new WarsongFlagsHandler(), ImplicitTargetType.Duel);
+			SpellEffect heffect = hordeFlagSpell.AddAuraEffect(() => new WarsongFlagsHandler(), ImplicitSpellTargetType.Duel);
 
 			Spell allianceFlagSpell = SpellHandler.Get(SpellId.SilverwingFlag);
-			SpellEffect aeffect = allianceFlagSpell.AddAuraEffect(() => new WarsongFlagsHandler(), ImplicitTargetType.Duel);
+			SpellEffect aeffect = allianceFlagSpell.AddAuraEffect(() => new WarsongFlagsHandler(), ImplicitSpellTargetType.Duel);
 
 			// Replacing the spelleffectHandler
 			SpellHandler.Apply(spell =>

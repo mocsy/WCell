@@ -100,7 +100,7 @@ namespace WCell.RealmServer.Entities
 
 			Orientation = m_record.Orientation;
 
-			m_bindLocation = new ZoneWorldLocation(
+			m_bindLocation = new WorldZoneLocation(
 				m_record.BindMap,
 				new Vector3(m_record.BindX, m_record.BindY, m_record.BindZ),
 				m_record.BindZone);
@@ -427,18 +427,19 @@ namespace WCell.RealmServer.Entities
 			}
 
 			var isStaff = Role.IsStaff;
-			if (m_Map == null)
+			if (m_Map == null && (!isStaff || (m_Map = InstanceMgr.CreateInstance(this, m_record.MapId)) == null))
 			{
+				// map does not exist anymore
 				Load();
 				TeleportToBindLocation();
 				AddMessage(InitializeCharacter);
+				return;
 			}
 			else
 			{
 				Load();
 				if (m_Map.IsDisposed ||
-					(m_Map.IsInstance && (m_Map.CreationTime > m_record.LastLogout ||
-											 (!m_Map.CanEnter(this) && !isStaff))))
+					(m_Map.IsInstance && !isStaff && (m_Map.CreationTime > m_record.LastLogout || !m_Map.CanEnter(this))))
 				{
 					// invalid Map or not allowed back in (might be an Instance)
 					m_Map.TeleportOutside(this);
@@ -449,11 +450,14 @@ namespace WCell.RealmServer.Entities
 				{
 					m_Map.AddMessage(() =>
 					{
+						// add to map
 						if (m_Map is Battleground)
 						{
 							var bg = (Battleground)m_Map;
 							if (!bg.LogBackIn(this))
 							{
+								// teleport out of BG
+								AddMessage(InitializeCharacter);
 								return;
 							}
 						}
