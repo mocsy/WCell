@@ -1,3 +1,5 @@
-- MageArcaneArcaneShielding now reduces mana drained by mana shield
-- when ManaRegenPerTickInterruptedPct is set, update mana regen calculations
-- compressed SpellProcEvent.cs; fixed event indexing; prevent assigning of "null masks"; added more overriding; added xml file to sln; also, load the DB proc info before the second initialization pass, so values can be overridden
+- last commit was a bust - accidentally slipped "-a" into the commit command
+ -> the last commit also added a big bulk to the new AI spell cast system
+ -> this cures things again, including spell targeting which was bugged before
+- improved aura stacking logic
+- added NPCDifficulty override info to the npc dump

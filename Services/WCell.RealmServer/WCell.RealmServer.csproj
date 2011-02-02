@@ -208,6 +208,7 @@
     <Compile Include="Battlegrounds\PvPDifficulty.cs" />
     <Compile Include="Commands\AchievementCommands.cs" />
     <Compile Include="Commands\Extensions.cs" />
+    <Compile Include="Commands\GossipCommand.cs" />
     <Compile Include="Commands\LocalizerCommand.cs" />
     <Compile Include="Database\ArenaTeam.cs" />
     <Compile Include="Database\ArenaTeamMember.cs" />
@@ -225,6 +226,7 @@
     <Compile Include="GameObjects\Spawns\GOSpawnPoint.cs" />
     <Compile Include="GameObjects\Spawns\GOSpawnPool.cs" />
     <Compile Include="GameObjects\Spawns\GOSpawnPoolTemplate.cs" />
+    <Compile Include="Global\WorldInstanceCollection.cs" />
     <Compile Include="Global\WorldEvent.cs" />
     <Compile Include="Global\WorldEventMgr.cs" />
     <Compile Include="Global\WorldMapOverlayEntry.cs" />
@@ -247,9 +249,11 @@
     <Compile Include="Spawns\SpawnPoolTemplate.cs" />
     <Compile Include="Spawns\SpawnPool.cs" />
     <Compile Include="Spawns\SpawnPoolTemplateEntry.cs" />
+    <Compile Include="Spells\Auras\Misc\AddProcHandler.cs" />
     <Compile Include="Spells\Auras\Mod\ModAttackerSpellCritChanceHandler.cs" />
     <Compile Include="AI\Spells\SpellCast.AI.cs" />
     <Compile Include="Spells\SpellProcEventEntry.cs" />
+    <Compile Include="Spells\SpellTargetMethods.cs" />
     <Compile Include="Titles\CharacterTitleEntry.cs" />
     <Compile Include="NPCs\INPCDataHolder.cs" />
     <Compile Include="NPCs\NPCAddonData.cs" />

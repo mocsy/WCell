@@ -11,14 +11,14 @@ namespace WCell.RealmServer.Spells
 	/// </summary>
 	public class AISpellSettings
 	{
-		public static readonly CooldownRange[] DefaultCooldownsByCategory = new CooldownRange[(int)AISpellCategory.End];
+		public static readonly CooldownRange[] DefaultCooldownsByCategory = new CooldownRange[(int)AISpellCooldownCategory.End];
 
-		public static CooldownRange GetDefaultCategoryCooldown(AISpellCategory cat)
+		public static CooldownRange GetDefaultCategoryCooldown(AISpellCooldownCategory cat)
 		{
 			return DefaultCooldownsByCategory[(int)cat];
 		}
 
-		public static void SetDefaultCategoryCooldown(AISpellCategory cat, int min, int max)
+		public static void SetDefaultCategoryCooldown(AISpellCooldownCategory cat, int min, int max)
 		{
 			DefaultCooldownsByCategory[(int)cat] = new CooldownRange(min, max);
 		}
@@ -26,10 +26,10 @@ namespace WCell.RealmServer.Spells
 		static AISpellSettings()
 		{
 			// initialize with default values - can be changed using the static SetDefaultCategoryCooldown method
-			DefaultCooldownsByCategory[(int)AISpellCategory.AuraBeneficial] = new CooldownRange(30000, 60000);
-			DefaultCooldownsByCategory[(int)AISpellCategory.AuraHarmful] = new CooldownRange(30000, 60000);
-			DefaultCooldownsByCategory[(int)AISpellCategory.DirectBeneficial] = new CooldownRange(30000, 60000);
-			DefaultCooldownsByCategory[(int)AISpellCategory.DirectHarmful] = new CooldownRange(5000, 10000);
+			DefaultCooldownsByCategory[(int)AISpellCooldownCategory.AuraBeneficial] = new CooldownRange(30000, 60000);
+			DefaultCooldownsByCategory[(int)AISpellCooldownCategory.AuraHarmful] = new CooldownRange(30000, 60000);
+			DefaultCooldownsByCategory[(int)AISpellCooldownCategory.DirectBeneficial] = new CooldownRange(30000, 60000);
+			DefaultCooldownsByCategory[(int)AISpellCooldownCategory.DirectHarmful] = new CooldownRange(5000, 10000);
 		}
 
 		public readonly CooldownRange Cooldown = new CooldownRange(-1, -1);
@@ -38,8 +38,6 @@ namespace WCell.RealmServer.Spells
 		/// Amount of time to idle after casting the spell
 		/// </summary>
 		public int IdleTimeAfterCastMillis = 500;
-
-		public AISpellCastTargetType TargetType;
 
 		public AISpellSettings(Spell spell)
 		{
@@ -52,21 +50,14 @@ namespace WCell.RealmServer.Spells
 			private set;
 		}
 
-		public void SetValues(int cdMin, int cdMax, AISpellCastTargetType targetType)
+		public void SetValues(int cdMin, int cdMax)
 		{
 			SetCooldown(cdMin, cdMax);
-			TargetType = targetType;
 		}
 
-		public void SetValues(int cd, AISpellCastTargetType targetType)
+		public void SetValues(int cd)
 		{
 			SetCooldown(cd);
-			TargetType = targetType;
-		}
-
-		public void SetTarget(AISpellCastTargetType targetType)
-		{
-			TargetType = targetType;
 		}
 
 		public void SetCooldown(int cd)
@@ -84,7 +75,9 @@ namespace WCell.RealmServer.Spells
 		internal void InitializeAfterLoad()
 		{
 			// set all values that were not overridden
-			var category = Spell.GetSpellAICategory();
+			var category = Spell.GetAISpellCooldownCategory();
+
+			// select a default cooldown time
 			var def = GetDefaultCategoryCooldown(category);
 
 			if (Cooldown.MinDelay < 0)
@@ -95,37 +88,6 @@ namespace WCell.RealmServer.Spells
 			if (Cooldown.MaxDelay < 0)
 			{
 				Cooldown.MinDelay = def.MaxDelay;
-			}
-
-			if (TargetType == AISpellCastTargetType.Default)
-			{
-				// figure out what kind of targeting method each effect requires
-				foreach (var effect in Spell.Effects)
-				{
-					// only assign target type, if not overridden
-					if (effect.AISpellCastTargetType != AISpellCastTargetType.Default) continue;
-
-					if (effect.IsHealEffect)
-					{
-						effect.AISpellCastTargetType = AISpellCastTargetType.WoundedAlly;
-					}
-					else if (effect.IsDamageEffect)
-					{
-						effect.AISpellCastTargetType = AISpellCastTargetType.Hostile;
-					}
-					else if (effect.IsAuraEffect)
-					{
-						// avoid targets that already have that Aura
-						effect.AISpellCastTargetType = effect.HarmType == HarmType.Beneficial ? 
-							AISpellCastTargetType.ExclusiveBuff : AISpellCastTargetType.ExclusiveDebuff;
-					}
-					else
-					{
-						// no other category
-						effect.AISpellCastTargetType = effect.HarmType == HarmType.Beneficial ?
-							AISpellCastTargetType.Allied : AISpellCastTargetType.Hostile;
-					}
-				}
 			}
 		}
 		#endregion
@@ -156,11 +118,11 @@ namespace WCell.RealmServer.Spells
 	}
 	#endregion
 
-	#region AISpellCategory
+	#region AISpellCooldownCategory
 	/// <summary>
-	/// Categories of spells for AI casters
+	/// Categories of default cooldowns for AI casters
 	/// </summary>
-	public enum AISpellCategory
+	public enum AISpellCooldownCategory
 	{
 		/// <summary>
 		/// Buff or positive aura (eg. to improve stats, speed etc)
@@ -186,75 +148,26 @@ namespace WCell.RealmServer.Spells
 	}
 	#endregion
 
-	#region AISpellCastTarget
-	/// <summary>
-	/// Custom target types that are not covered by <see cref="ImplicitSpellTargetType"/>
-	/// </summary>
-	public enum AISpellCastTargetType
-	{
-		Default,
-
-		// standard targets (used for any spell, by default)
-		
-		// hostile
-
-		/// <summary>
-		/// Negative auras
-		/// </summary>
-		ExclusiveDebuff,
-
-		/// <summary>
-		/// Damage spells only require hostile targets
-		/// </summary>
-		Hostile,
-
-
-		// allied
-		
-		/// <summary>
-		/// Any positive non-categorized spell
-		/// </summary>
-		Allied,
-
-		/// <summary>
-		/// Positive auras
-		/// </summary>
-		ExclusiveBuff,
-
-		/// <summary>
-		/// Heal spells
-		/// </summary>
-		WoundedAlly,
-
-
-
-		// special targets (used for boss spells)
-
-		// hostile
-		NearestHostilePlayer,
-		RandomHostilePlayer,
-		SecondHighestThreatTarget,
-
-
-		// allied
-		RandomAlliedUnit
-	}
-	#endregion
-
 	#region SpellAIUtil
 	public static class AISpellUtil
 	{
-		public static AISpellCategory GetSpellAICategory(this Spell spell)
+		public static AISpellCooldownCategory GetAISpellCooldownCategory(this Spell spell)
 		{
 			var beneficial = spell.HarmType == HarmType.Beneficial;
 			if (spell.IsAura)
 			{
-				return beneficial ? AISpellCategory.AuraBeneficial : AISpellCategory.AuraHarmful;
+				return beneficial ? AISpellCooldownCategory.AuraBeneficial : AISpellCooldownCategory.AuraHarmful;
 			}
 			else
 			{
-				return beneficial ? AISpellCategory.DirectBeneficial : AISpellCategory.DirectHarmful;
+				return beneficial ? AISpellCooldownCategory.DirectBeneficial : AISpellCooldownCategory.DirectHarmful;
 			}
+		}
+
+		public static TargetDefinition GetDefaultAITargetHandlerDefintion(SpellEffect effect)
+		{
+			// TODO
+			return null;
 		}
 	}
 	#endregion
