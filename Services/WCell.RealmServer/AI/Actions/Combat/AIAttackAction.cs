@@ -13,31 +13,11 @@ namespace WCell.RealmServer.AI.Actions.Combat
 	/// </summary>
 	public class AIAttackAction : AITargetMoveAction
 	{
-		/// <summary>
-		/// Every x Map-Ticks shuffle Spells
-		/// </summary>
-		public static int SpellShuffleTicks = 50;
-
-		/// <summary>
-		/// Every x Map-Ticks try to cast a random active spell
-		/// </summary>
-		public static int SpellCastTicks = 1;
-
 		protected float maxDist, desiredDist;
 
 		public AIAttackAction(NPC owner)
 			: base(owner)
 		{
-		}
-
-		public bool UsesSpells
-		{
-			get { return m_owner.HasSpells; }
-		}
-
-		public bool HasSpellReady
-		{
-			get { return ((NPC)m_owner).NPCSpells.ReadyCount > 0; }
 		}
 
 		public override float DistanceMin
@@ -90,13 +70,10 @@ namespace WCell.RealmServer.AI.Actions.Combat
 			// Check for spells that we can cast
 			if (UsesSpells && HasSpellReady && m_owner.CanCastSpells)
 			{
-				if (!m_owner.CanMelee || m_owner.CheckTicks(SpellCastTicks))
+				if (TryCastSpell())
 				{
-					if (TryCastSpell())
-					{
-						m_owner.Movement.Stop();
-						return;
-					}
+					m_owner.Movement.Stop();
+					return;
 				}
 			}
 
@@ -123,13 +100,6 @@ namespace WCell.RealmServer.AI.Actions.Combat
 		protected bool TryCastSpell()
 		{
 			var owner = (NPC)m_owner;
-
-			// no need to shuffle - spells are on cooldowns anyway
-			//var spells = owner.NPCSpells;
-			//if (owner.CheckTicks(SpellShuffleTicks))
-			//{
-			//    spells.ShuffleReadySpells();
-			//}
 
 			foreach (var spell in owner.NPCSpells.ReadySpells)
 			{

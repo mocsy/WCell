@@ -5,11 +5,11 @@ using NLog;
 using WCell.Constants;
 using WCell.Constants.Misc;
 using WCell.Constants.Spells;
-using WCell.RealmServer.AI.Spells;
 using WCell.RealmServer.Entities;
 using WCell.RealmServer.Handlers;
 using WCell.RealmServer.Spells.Auras;
 using WCell.RealmServer.Misc;
+using WCell.RealmServer.Spells.Targeting;
 
 namespace WCell.RealmServer.Spells
 {
@@ -881,6 +881,11 @@ namespace WCell.RealmServer.Spells
 			if (!m_casting)
 			{
 				return; // should not happen (but might)
+			}
+
+			if (IsAICast)
+			{
+				OnAICasted();
 			}
 
 			// Casted event
