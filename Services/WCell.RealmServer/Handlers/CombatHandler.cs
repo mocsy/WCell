@@ -18,12 +18,11 @@ namespace WCell.RealmServer.Handlers
 				var targetId = packet.ReadEntityId();
 				var target = chr.Map.GetObject(targetId) as Unit;
 
-				if (target != null && 
+				if (target != null &&
 					chr.CanHarm(target) &&
 					chr.CanSee(target))
 				{
 					chr.Target = target;
-					chr.IsInCombat = true;
 					chr.IsFighting = true;
 
 					// inform everyone
@@ -96,6 +95,7 @@ namespace WCell.RealmServer.Handlers
 			{
 				return;
 			}
+
 			using (var packet = new RealmPacketOut(RealmServerOpCode.SMSG_ATTACKERSTATEUPDATE, 100))
 			{
 				var evade = action.VictimState == VictimState.Evade;
@@ -104,6 +104,7 @@ namespace WCell.RealmServer.Handlers
 					//action.HitFlags |= HitFlags.HitFlag_0x800 | HitFlags.Absorb_1;
 				}
 				packet.Write((uint)action.HitFlags);
+
 				action.Attacker.EntityId.WritePacked(packet);
 				action.Victim.EntityId.WritePacked(packet);
 

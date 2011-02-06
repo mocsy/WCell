@@ -182,19 +182,19 @@ namespace WCell.RealmServer.Entities
 
 		/// <summary>
 		/// Whether the physical state of this Unit allows it to move.
-		/// To stop a char from moving, use IncMechanicCount to increase Rooted or any other movement-effecting Mechanic-school.
-		/// Use MayMove to also take Movement-controlling (eg by AI etc) into consideration.
+		/// To stop a character from moving, use IncMechanicCount to increase Rooted or any other movement-effecting Mechanic-school.
+		/// Use HasPermissionToMove to also take Movement-controlling (eg by AI etc) into consideration.
 		/// </summary>
 		public bool CanMove
 		{
-			get { return m_canMove && HasOwnerPermissionToMove; }
+			get { return m_canMove && HasPermissionToMove; }
 		}
 
 		/// <summary>
 		/// Whether the owner or controlling AI allows this unit to move.
 		/// Always returns true for uncontrolled players.
 		/// </summary>
-		public bool HasOwnerPermissionToMove
+		public bool HasPermissionToMove
 		{
 			get { return m_Movement == null || m_Movement.MayMove; }
 			set
@@ -1365,17 +1365,17 @@ namespace WCell.RealmServer.Entities
 		public bool TeleportTo(IWorldLocation location)
 		{
 			var pos = location.Position;
-			var rgn = location.Map;
-			if (rgn == null)
+			var map = location.Map;
+			if (map == null)
 			{
 				if (Map.Id != location.MapId)
 				{
 					return false;
 				}
-				rgn = Map;
+				map = Map;
 			}
 
-			TeleportTo(rgn, ref pos, m_orientation);
+			TeleportTo(map, ref pos, m_orientation);
 			Phase = location.Phase;
 
 			if (location is WorldObject)

@@ -349,7 +349,7 @@ namespace WCell.RealmServer.Entities
 		/// </summary>
 		void BecomeGhost()
 		{
-			SpellCast.Start(SpellHandler.Get(SpellId.Ghost), true, this);
+			SpellCast.Start(SpellHandler.Get(SpellId.Ghost_2), true, this);
 		}
 
 		/// <summary>
@@ -1766,7 +1766,7 @@ namespace WCell.RealmServer.Entities
 		#endregion
 
 		#region ICharacterSet
-		public int Count
+		public int CharacterCount
 		{
 			get { return 1; }
 		}
@@ -1776,7 +1776,7 @@ namespace WCell.RealmServer.Entities
 			callback(this);
 		}
 
-		public Character[] GetCharacters()
+		public Character[] GetAllCharacters()
 		{
 			return new[] { this };
 		}

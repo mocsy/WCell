@@ -1,4 +1,4 @@
-/*************************************************************************
+﻿/*************************************************************************
  *
  *   file		: Owner.Update.cs
  *   copyright		: (C) The WCell Team
@@ -126,12 +126,21 @@ namespace WCell.RealmServer.Entities
 
 		#region World Knowledge
 		/// <summary>
+		/// Resends all updates of everything
+		/// </summary>
+		public void ResetOwnWorld()
+		{
+			MovementHandler.SendNewWorld(Client, MapId, ref m_position, Orientation);
+			ClearSelfKnowledge();
+		}
+
+		/// <summary>
 		/// Clears known objects and leads to resending of the creation packet
 		/// during the next Map-Update.
 		/// This is only needed for teleporting or body-transfer.
 		/// Requires map context.
 		/// </summary>
-		public void ClearSelfKnowledge()
+		internal void ClearSelfKnowledge()
 		{
 			KnownObjects.Clear();
 			NearbyObjects.Clear();
@@ -142,6 +151,17 @@ namespace WCell.RealmServer.Entities
 				item.m_unknown = true;
 				m_itemsRequiringUpdates.Add(item);
 			}
+		}
+
+		/// <summary>
+		/// Will resend update packet of the given object
+		/// </summary>
+		public void InvalidateKnowledgeOf(WorldObject obj)
+		{
+			KnownObjects.Remove(obj);
+			NearbyObjects.Remove(obj);
+
+			obj.SendDestroyToPlayer(this);
 		}
 
 		/// <summary>
@@ -347,7 +367,7 @@ namespace WCell.RealmServer.Entities
 			UpdateCount = 0;
 		}
 
-		public override UpdateFieldFlags GetVisibilityFor(Character chr)
+		public override UpdateFieldFlags GetUpdateFieldVisibilityFor(Character chr)
 		{
 			if (chr == this)
 			{

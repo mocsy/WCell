@@ -188,11 +188,6 @@
     <Compile Include="Battlegrounds\WarsongGulch\WSGStats.cs" />
     <Compile Include="Commands\AddonDevCommands.cs" />
     <Compile Include="Commands\TeleSpellCommand.cs" />
-    <Compile Include="Editor\Figurines\Figurine.cs" />
-    <Compile Include="Editor\Figurines\SpawnFigurine.cs" />
-    <Compile Include="Editor\Figurines\WaypointFigurine.cs" />
-    <Compile Include="Editor\MapEditor.cs" />
-    <Compile Include="Editor\SpawnGossips.cs" />
     <Compile Include="Gossip\Guard Gossip\Alliance\AllianceTowns.cs" />
     <Compile Include="Gossip\Guard Gossip\Alliance\Darnassus.cs" />
     <Compile Include="Gossip\Guard Gossip\Alliance\Exodar.cs" />
@@ -320,7 +315,7 @@
     <Compile Include="Teleport\TeleportNetwork.cs" />
     <Compile Include="Samples\AmbusherQuestSample.cs" />
     <Compile Include="Samples\MixedSamples.cs" />
-    <Compile Include="Samples\NPCs.cs" />
+    <Compile Include="Samples\SampleNPCs.cs" />
     <Compile Include="Spells\DeathKnight\DeathKnightFixes.cs" />
     <Compile Include="Spells\Druid\DruidFixes.cs" />
     <Compile Include="Spells\Hunter\HunterFixes.cs" />

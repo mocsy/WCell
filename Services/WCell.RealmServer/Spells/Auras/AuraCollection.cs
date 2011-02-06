@@ -156,24 +156,24 @@ namespace WCell.RealmServer.Spells.Auras
 		{
 			get
 			{
-				if (spell.CanApplyMultipleTimes)
+				Aura aura;
+				if (spell.HarmType == HarmType.Beneficial || spell.HarmType == HarmType.Neutral)
 				{
-					foreach (var aura in m_AuraArray)
-					{
-						if (aura.Spell == spell)
-						{
-							return aura;
-						}
-					}
+					aura = this[spell, true];
 				}
 				else
 				{
-					Aura aura;
-					m_auras.TryGetValue(new AuraIndexId(spell.AuraUID, !spell.HasHarmfulEffects), out aura);
-					if (aura != null && aura.Spell.Id == spell.Id)
-					{
-						return aura;
-					}
+					aura = null;
+				}
+
+				if (aura == null && spell.HasHarmfulEffects)
+				{
+					aura = this[spell, false];
+				}
+
+				if (aura != null && aura.Spell == spell)
+				{
+					return aura;
 				}
 				return null;
 			}
@@ -303,7 +303,7 @@ namespace WCell.RealmServer.Spells.Auras
 		}
 
 		/// <summary>
-		/// Get an Aura that is incompatible with the one represented by the given spell.
+		/// Get an Aura that is incompatible with the one represented by the given spell
 		/// </summary>
 		/// <returns>Whether or not another Aura may be applied</returns>
 		public Aura GetAura(ObjectReference caster, AuraIndexId id, Spell spell)
@@ -334,6 +334,36 @@ namespace WCell.RealmServer.Spells.Auras
 				}
 			}
 			return null;
+		}
+		public int GetTotalAuraModifier(AuraType type)
+		{
+			int totalmods = 0;
+			foreach (var aura in this)
+			{
+				foreach (var effect in aura.Spell.Effects)
+				{
+					if (effect.AuraType == type)
+						totalmods += effect.CalcEffectValue();
+				}
+			}
+			return totalmods;
+		}
+		/// <summary>
+		/// Gets the total modifiers of an AuraType in this AuraCollection.
+		/// Takes only auras with a given miscvalue into account.
+		/// </summary>
+		public int GetTotalAuraModifier(AuraType type, int miscvalue)
+		{
+			int totalmods = 0;
+			foreach (var aura in this)
+			{
+				foreach (var effect in aura.Spell.Effects)
+				{
+					if (effect.AuraType == type && effect.MiscValue == miscvalue)
+						totalmods += effect.CalcEffectValue();
+				}
+			}
+			return totalmods;
 		}
 		#endregion
 
@@ -538,17 +568,9 @@ namespace WCell.RealmServer.Spells.Auras
 		}
 
 		/// <summary>
-		/// Adds and starts an already created Aura
+		/// Adds an already created Aura and optionally starts it
 		/// </summary>
-		public void AddAura(Aura aura)
-		{
-			AddAura(aura, true);
-		}
-
-		/// <summary>
-		/// Adds an already created Aura
-		/// </summary>
-		public virtual void AddAura(Aura aura, bool start)
+		public virtual void AddAura(Aura aura, bool start = true)
 		{
 			var id = aura.Id;
 			if (m_auras.ContainsKey(aura.Id))
@@ -659,7 +681,7 @@ namespace WCell.RealmServer.Spells.Auras
 				if (aura != null && predicate(aura))
 				{
 					aura.Remove(false);
-					if (count >= max)
+					if (++count >= max)
 					{
 						break;
 					}
@@ -729,26 +751,43 @@ namespace WCell.RealmServer.Spells.Auras
 		}
 
 		/// <summary>
+		/// Removes and cancels the first Aura of the given SpellLine
+		/// </summary>
+		public bool Remove(SpellLineId spellLine)
+		{
+			var aura = this[spellLine];
+
+			if (aura != null)
+			{
+				aura.Remove();
+				return true;
+			}
+			return false;
+		}
+
+		/// <summary>
+		/// Removes and cancels the first Aura of the given SpellLine
+		/// </summary>
+		public bool Remove(SpellLine spellLine)
+		{
+			var aura = this[spellLine];
+
+			if (aura != null)
+			{
+				aura.Remove();
+				return true;
+			}
+			return false;
+		}
+
+		/// <summary>
 		/// Removes and cancels the first Aura of the given Spell
 		/// </summary>
 		public bool Remove(Spell spell)
 		{
-			Aura aura;
-			if (spell.HarmType == HarmType.Beneficial || spell.HarmType == HarmType.Neutral)
-			{
-				aura = this[spell, true];
-			}
-			else
-			{
-				aura = null;
-			}
+			var aura = this[spell];
 
-			if (aura == null && spell.HasHarmfulEffects)
-			{
-				aura = this[spell, false];
-			}
-
-			if (aura != null && aura.Spell.Id == spell.Id)
+			if (aura != null)
 			{
 				aura.Remove();
 				return true;
@@ -1104,7 +1143,7 @@ namespace WCell.RealmServer.Spells.Auras
 		{
 			foreach (var aura in m_visibleAuras)
 			{
-				if (aura != null && aura.CanBeSaved)
+				if (aura != null && aura.CanBeSaved && (!aura.HasTimeout || aura.TimeLeft > 5000))
 				{
 					aura.SaveNow();
 				}

@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using WCell.Constants.GameObjects;
 using WCell.Constants.Looting;
 using WCell.Constants.World;
+using WCell.RealmServer.Content;
 using WCell.RealmServer.Entities;
 using WCell.RealmServer.GameObjects.GOEntries;
 using WCell.RealmServer.GameObjects.Spawns;
 using WCell.RealmServer.Global;
+using WCell.RealmServer.Gossips;
 using WCell.RealmServer.Lang;
 using WCell.RealmServer.Looting;
 using WCell.RealmServer.Misc;
@@ -184,6 +186,27 @@ namespace WCell.RealmServer.GameObjects
 		}
 		#endregion
 
+		/// <summary>
+		/// Some GOs have a QuestId
+		/// </summary>
+		public virtual uint QuestId
+		{
+			get { return 0; }
+		}
+
+		/// <summary>
+		/// Some GOs have a PageId
+		/// </summary>
+		public virtual uint PageId
+		{
+			get { return 0; }
+		}
+
+		public virtual uint GossipId
+		{
+			get { return 0; }
+		}
+
 		#region Quests
 		[NotPersistent]
 		public readonly List<QuestTemplate> RequiredQuests = new List<QuestTemplate>(3);
@@ -232,6 +255,27 @@ namespace WCell.RealmServer.GameObjects
 
 			InitEntry();
 
+			// create GossipMenu
+			if (GossipId != 0 && DefaultGossip == null)
+			{
+				var gossipEntry = GossipMgr.GetEntry(GossipId);
+				if (gossipEntry == null)
+				{
+					ContentMgr.OnInvalidDBData("GOEntry {0} has missing GossipId: {1}", this, GossipId);
+					DefaultGossip = new GossipMenu();
+				}
+				else
+				{
+					DefaultGossip = new GossipMenu(GossipId);
+				}
+			}
+			else if (QuestHolderInfo != null)
+			{
+				// Make sure, there is a gossip menu, so quests can be started/completed
+				DefaultGossip = new GossipMenu();
+			}
+
+			// set HandlerCreator
 			if (HandlerCreator == null)
 			{
 				HandlerCreator = GOMgr.Handlers[(int)Type];

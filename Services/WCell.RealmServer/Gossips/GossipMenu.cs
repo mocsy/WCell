@@ -9,6 +9,28 @@ using WCell.RealmServer.Lang;
 
 namespace WCell.RealmServer.Gossips
 {
+	public abstract class DynamicTextGossipMenu : GossipMenu
+	{
+		private static readonly DynamicGossipEntry SharedEntry = new DynamicGossipEntry(88993333, new DynamicGossipText(OnTextQuery));
+
+		private static string OnTextQuery(GossipConversation convo)
+		{
+			return ((DynamicTextGossipMenu)convo.CurrentMenu).GetText(convo);
+		}
+
+		protected DynamicTextGossipMenu()
+			: base(SharedEntry)
+		{
+		}
+
+		protected DynamicTextGossipMenu(params GossipMenuItemBase[] items)
+			: base(SharedEntry, items)
+		{
+		}
+
+		public abstract string GetText(GossipConversation convo);
+	}
+
 	/// <summary>
 	/// Represents single menu in conversation with it's items
 	/// </summary>
@@ -83,17 +105,6 @@ namespace WCell.RealmServer.Gossips
 			: this(text)
 		{
 			m_gossipItems = items;
-		}
-
-		public GossipMenu(IGossipEntry text, params GossipMenuItem[] items)
-			: this(text)
-		{
-			m_gossipItems = new List<GossipMenuItemBase>(items.Length);
-			foreach (var item in items)
-			{
-				CheckItem(item);
-				m_gossipItems.Add(item);
-			}
 		}
 
 		public GossipMenu(IGossipEntry text, params GossipMenuItemBase[] items)
@@ -173,44 +184,43 @@ namespace WCell.RealmServer.Gossips
 			}
 		}
 
-		public int GetValidItemsCount(Character speaker)
-		{
-			var gossipItems = GossipItems;
-			var count = gossipItems.Count;
-
-			for (int i = 0; i < gossipItems.Count; i++)
-			{
-				bool shouldShow = true;
-
-				if (gossipItems[i].Action != null && !gossipItems[i].Action.CanUse(speaker))
-					shouldShow = false;
-
-				if (!shouldShow)
-				{
-					gossipItems[i] = null;
-					count--;
-				}
-			}
-			return count;
-		}
-
 		public void AddItem(GossipMenuItemBase item)
 		{
 			if (m_gossipItems == null)
-				m_gossipItems = new List<GossipMenuItemBase>(1);
-
-			if (item != null)
 			{
-				CheckItem(item);
+				m_gossipItems = new List<GossipMenuItemBase>(1);
+			}
+
+			CheckItem(item);
+			m_gossipItems.Add(item);
+		}
+
+		/// <summary>
+		/// Replaces the item at the given index with the given item.
+		/// If index == count, appends item to end.
+		/// </summary>
+		public void SetItem(int index, GossipMenuItemBase item)
+		{
+			if (m_gossipItems == null)
+			{
+				m_gossipItems = new List<GossipMenuItemBase>(1);
+			}
+
+			CheckItem(item);
+			if (index == m_gossipItems.Count)
+			{
+				// append to end
 				m_gossipItems.Add(item);
+			}
+			else
+			{
+				// replace
+				m_gossipItems[index] = item;
 			}
 		}
 
 		public void AddItem(GossipMenuIcon type)
 		{
-			if (m_gossipItems == null)
-				m_gossipItems = new List<GossipMenuItemBase>(1);
-
 			AddItem(new GossipMenuItem(type, type.ToString()));
 		}
 
@@ -236,14 +246,9 @@ namespace WCell.RealmServer.Gossips
 			AddItem(new QuitGossipMenuItem(msg, args));
 		}
 
-		public void AddQuitMenuItem(string text, GossipActionHandler callback)
+		public void AddQuitMenuItem(GossipActionHandler callback, RealmLangKey msg = RealmLangKey.Done, params object[] args)
 		{
-			var action = new NonNavigatingGossipAction(convo =>
-			{
-				callback(convo);
-				convo.Character.GossipConversation.StayOpen = false;
-			});
-			AddItem(new GossipMenuItem(text, action));
+			AddItem(new QuitGossipMenuItem(callback, msg, args));
 		}
 
 		public void AddGoBackItem()
@@ -268,6 +273,23 @@ namespace WCell.RealmServer.Gossips
 				convo.Character.GossipConversation.GoBack();
 			});
 			AddItem(new GossipMenuItem(text, action));
+		}
+
+		public bool RemoveItem(GossipMenuItemBase item)
+		{
+			return m_gossipItems.Remove(item);
+		}
+
+		public void ClearAllItems()
+		{
+			m_gossipItems.Clear();
+		}
+
+		/// <summary>
+		/// Called before menu is sent to Character
+		/// </summary>
+		protected internal virtual void OnDisplay(GossipConversation convo)
+		{
 		}
 
 		internal void NotifyClose(GossipConversation convo)

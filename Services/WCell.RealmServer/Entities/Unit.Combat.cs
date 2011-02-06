@@ -236,6 +236,7 @@ namespace WCell.RealmServer.Entities
 		/// <param name="action"></param>
 		public void Strike(IWeapon weapon, DamageAction action, Unit target)
 		{
+			IsInCombat = true;
 			if (UsesPendingAbility(weapon))
 			{
 				m_spellCast.Perform();
@@ -356,6 +357,11 @@ namespace WCell.RealmServer.Entities
 				}
 			}
 
+			if (this is NPC)
+			{
+				damage = (int)(damage * NPCMgr.DefaultNPCDamageFactor + 0.999999f);
+			}
+
 			if (usedAbility != null && usedAbility.IsCasting)
 			{
 				// get damage modifiers from spell
@@ -410,6 +416,10 @@ namespace WCell.RealmServer.Entities
 			if (attacker != null && !attacker.IsInContext)
 			{
 				attacker = null;
+			}
+			if (attacker is NPC)
+			{
+				dmg = (int)(dmg * NPCMgr.DefaultNPCDamageFactor + 0.999999f);
 			}
 
 			DamageSchool school;
@@ -921,7 +931,7 @@ namespace WCell.RealmServer.Entities
 									// ability is pending -> Need to cancel
 									m_spellCast.Cancel(SpellFailedReason.OutOfRange);
 								}
-								
+
 								// no pending ability
 								if (this is Character)
 								{

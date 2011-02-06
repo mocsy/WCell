@@ -192,15 +192,14 @@ namespace WCell.RealmServer.Entities
 
 			// health + power
 			var health = entry.GetRandomHealth();
-			SetUInt32(UnitFields.MAXHEALTH, health);
-			SetUInt32(UnitFields.BASE_HEALTH, health);
+			SetInt32(UnitFields.MAXHEALTH, health);
+			SetInt32(UnitFields.BASE_HEALTH, health);
 
-			if (m_spawnPoint == null || !m_spawnPoint.SpawnEntry.IsDead)
+			if (m_entry.IsDead || m_spawnPoint == null || !m_spawnPoint.SpawnEntry.IsDead)
 			{
-				SetUInt32(UnitFields.HEALTH, health);
+				SetInt32(UnitFields.HEALTH, health);
 			}
-
-			if (m_entry.Regenerates)
+			else if (m_entry.Regenerates)
 			{
 				Regenerates = true;
 				HealthRegenPerTickNoCombat = Math.Max((int)m_entry.MaxHealth / 10, 1);
@@ -219,8 +218,6 @@ namespace WCell.RealmServer.Entities
 			{
 				ManaRegenPerTickInterruptedPct = 20;
 			}
-
-			HealthRegenPerTickNoCombat = BaseHealth / 5;
 
 			UpdateUnitState();
 
@@ -247,15 +244,12 @@ namespace WCell.RealmServer.Entities
 			{
 				InitImmovable();
 			}
+			Level = entry.GetRandomLevel();
 
 			AddMessage(() =>
 			{
 				// Set Level/Scale after NPC is in world:
-				if (!HasPlayerMaster)
-				{
-					Level = entry.GetRandomLevel();
-				}
-				else
+				if (HasPlayerMaster)
 				{
 					Level = m_master.Level;
 				}
@@ -302,7 +296,7 @@ namespace WCell.RealmServer.Entities
 				}
 				if (flags.HasFlag(UnitFlags.Passive))
 				{
-					HasOwnerPermissionToMove = false;
+					HasPermissionToMove = false;
 				}
 			}
 		}
@@ -914,7 +908,6 @@ namespace WCell.RealmServer.Entities
 			// trigger events
 			if (m_brain != null)
 			{
-				//spawn.Brain.MovementAI.SetSpawnPoint(pos);
 				m_brain.OnActivate();
 			}
 			m_entry.NotifyActivated(this);
@@ -934,6 +927,7 @@ namespace WCell.RealmServer.Entities
 				{
 					// master already gone
 					Delete();
+					return;
 				}
 			}
 		}
@@ -1360,6 +1354,11 @@ namespace WCell.RealmServer.Entities
 		public bool CanGiveQuestTo(Character chr)
 		{
 			return CheckVendorInteraction(chr);
+		}
+
+		public void OnQuestGiverStatusQuery(Character chr)
+		{
+			// do nothing
 		}
 		#endregion
 

@@ -47,8 +47,17 @@ using Cell.Core;
 namespace WCell.RealmServer.Entities
 {
 	/// <summary>
-	/// TODO: Orientation (and position) should be easily updatable through setting the corresponding Props (needs to send movement packets)
-	/// TODO: Check if Object is visible to Owner before sending certain packets to it?
+	/// Used to override visibility of objects
+	/// </summary>
+	public enum VisibilityStatus
+	{
+		Default,
+		Visible,
+		Invisible
+	}
+
+	/// <summary>
+	/// 
 	/// </summary>
 	public abstract partial class WorldObject : ObjectBase, IFactionMember, IWorldLocation, INamedEntity, IContextHandler
 	{
@@ -88,7 +97,7 @@ namespace WCell.RealmServer.Entities
 
 		public static float HighlightScale = 5f;
 
-		public static int HighlightTicks = 10;
+		public static int HighlightDelayMillis = 1500;
 		#endregion
 
 		protected Vector3 m_position;
@@ -117,6 +126,7 @@ namespace WCell.RealmServer.Entities
 		protected WorldObject()
 		{
 			CreationTime = Utility.GetSystemTime();
+			LastUpdateTime = DateTime.Now;
 		}
 
 		#region Misc Properties
@@ -249,6 +259,11 @@ namespace WCell.RealmServer.Entities
 			internal set { m_areaCharCount = value; }
 		}
 
+		protected internal virtual void OnEncounteredBy(Character chr)
+		{
+			++AreaCharCount;
+		}
+
 		public virtual bool IsTrap
 		{
 			get { return false; }
@@ -357,14 +372,14 @@ namespace WCell.RealmServer.Entities
 		#endregion
 
 		/// <summary>
-		/// Can be used to determine whether a periodic Action should be
-		/// executed on this Tick.
+		/// Can be used to slow down execution of methods that:
+		///		1. Should not be executed too often
+		///		2. Don't need to be timed precisely
+		/// For example: AI updates
 		/// </summary>
-		/// <param name="ticks"></param>
-		/// <returns></returns>
 		public bool CheckTicks(int ticks)
 		{
-			return ticks == 0 || ((m_ticks + EntityId.Low) % ticks) == 0;
+			return ticks == 0 || ((Map.TickCount + EntityId.Low) % ticks) == 0;
 		}
 
 		/// <summary>
@@ -679,9 +694,10 @@ namespace WCell.RealmServer.Entities
 		public void PlaceInFront(WorldObject obj)
 		{
 			var pos = m_position;
-			//pos.Z += 1;
-			m_position.GetPointYX(m_orientation, 5, out pos);
+			pos.Z += 1;
+			//m_position.GetPointYX(m_orientation, 5, out pos);
 			m_Map.TransferObjectLater(obj, pos);
+			obj.Orientation = obj.GetAngleTowards(this);
 		}
 		#endregion
 
@@ -1341,6 +1357,15 @@ namespace WCell.RealmServer.Entities
 			return IsInPhase(obj);
 		}
 
+		/// <summary>
+		/// Visibility of this object in the eyes of the given observer.
+		/// Can be used to override default visibility checks
+		/// </summary>
+		public virtual VisibilityStatus DetermineVisibilityFor(Unit observer)
+		{
+			return VisibilityStatus.Default;
+		}
+
 		public virtual bool IsPlayer
 		{
 			get { return false; }
@@ -1383,7 +1408,7 @@ namespace WCell.RealmServer.Entities
 		{
 			var diff = ((HighlightScale - 1) * ScaleX);
 			ScaleX = HighlightScale * ScaleX;
-			CallDelayedTicks(HighlightTicks, obj => obj.ScaleX -= diff);
+			CallDelayed(HighlightDelayMillis, obj => obj.ScaleX -= diff);
 		}
 
 		public void PlaySound(uint sound)

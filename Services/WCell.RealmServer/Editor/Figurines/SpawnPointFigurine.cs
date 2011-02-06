@@ -1,22 +1,16 @@
-using WCell.Constants;
-using WCell.Constants.Factions;
+using System;
 using WCell.Constants.NPCs;
-using WCell.Constants.Spells;
-using WCell.Constants.Updates;
-using WCell.Core.Network;
-using WCell.RealmServer.Entities;
+using WCell.RealmServer.Editor.Menus;
 using WCell.RealmServer.Factions;
 using WCell.RealmServer.NPCs.Spawns;
-using WCell.RealmServer.UpdateFields;
 using WCell.Util.Variables;
-using System.Collections.Generic;
 
-namespace WCell.RealmServer.NPCs.Figurines
+namespace WCell.RealmServer.Editor.Figurines
 {
 	/// <summary>
 	/// The visual component of a spawnpoint
 	/// </summary>
-	public class SpawnFigurine : Figurine
+	public class SpawnPointFigurine : EditorFigurine
 	{
 		/// <summary>
 		/// Scales the figurine in relation to its original version
@@ -30,29 +24,27 @@ namespace WCell.RealmServer.NPCs.Figurines
 		//[NotVariable]
 		//public static bool AddDecoMarker = true;
 
-		private readonly NPCSpawnPoint m_SpawnPoint;
-
-		public SpawnFigurine(NPCSpawnPoint spawnPoint)
-			: base(spawnPoint.SpawnEntry.Entry)
+		public SpawnPointFigurine(MapEditor editor, NPCSpawnPoint spawnPoint)
+			: base(editor, spawnPoint)
 		{
-			m_SpawnPoint = spawnPoint;
-			m_position = spawnPoint.SpawnEntry.Position;
+			m_position = spawnPoint.Position;
 
-			//GossipMenu = m_SpawnPoint.GossipMenu;
 			NPCFlags = NPCFlags.Gossip;
+		}
+
+		public override SpawnEditorMenu CreateEditorMenu()
+		{
+			return new SpawnPointEditorMenu(Editor, SpawnPoint, this);
 		}
 
 		public override float DefaultScale
 		{
-			get
-			{
-				return SpawnFigScale;
-			}
+			get { return SpawnFigScale; }
 		}
 
 		public override Faction Faction
 		{
-			get { return m_entry.Faction; }
+			get { return m_SpawnPoint.SpawnEntry.Entry.Faction; }
 			set { }
 		}
 	}

@@ -67,6 +67,8 @@ namespace WCell.RealmServer.Spells.Auras
 		protected AuraRecord m_record;
 
 		private Item m_UsedItem;
+
+		private bool m_hasPeriodicallyUpdatedEffectHandler;
 		#endregion
 
 		#region Creation & Init
@@ -95,14 +97,13 @@ namespace WCell.RealmServer.Spells.Auras
 			m_index = index;
 			m_auraLevel = (byte)casterReference.Level;
 
-			m_stackCount = (byte)m_spell.StackCount;
+			m_stackCount = (byte)m_spell.InitialStackCount;
 			if (m_stackCount > 0 && casterReference.UnitMaster != null)
 			{
 				m_stackCount = casterReference.UnitMaster.Auras.GetModifiedInt(SpellModifierType.Charges, m_spell, m_stackCount);
 			}
 
-			SetAmplitude();
-			DetermineFlags();
+			SetupValues();
 		}
 
 		internal Aura(AuraCollection auras, ObjectReference caster, AuraRecord record, List<AuraEffectHandler> handlers, byte index)
@@ -121,32 +122,39 @@ namespace WCell.RealmServer.Spells.Auras
 
 			m_stackCount = record.StackCount;
 
-			SetAmplitude();
-			DetermineFlags();
+			SetupValues();
 
 			// figure out amplitude and duration
 			m_duration = record.MillisLeft;
 			SetupTimer();
+
+			// Start is called later
 		}
 
+		/// <summary>
+		/// Called after setting up the Aura and before calling Start()
+		/// </summary>
 		private void SetupTimer()
 		{
-			if (m_amplitude == 0 && m_duration < int.MaxValue)
+			if (m_controller == null)
 			{
-				m_amplitude = m_duration;
-			}
-			if (m_amplitude > 0 && m_controller == null)
-			{
-				// Aura times itself
-				m_timer = new TimerEntry
+				// Aura controls itself
+				if ((m_amplitude > 0 || m_duration > 0))
 				{
-					Action = Apply
-				};
+					// aura has timer
+					m_timer = new TimerEntry
+								{
+									Action = Apply
+								};
+				}
 			}
 		}
 
-		private void SetAmplitude()
+		private void SetupValues()
 		{
+			DetermineFlags();
+			m_hasPeriodicallyUpdatedEffectHandler = m_handlers.Any(handler => handler is PeriodicallyUpdatedAuraEffectHandler);
+
 			if (m_amplitude != 0)
 				return;
 
@@ -190,7 +198,7 @@ namespace WCell.RealmServer.Spells.Auras
 				var index = handler.SpellEffect.EffectIndex;
 				if (index >= 0)
 				{
-					m_auraFlags |= (AuraFlags) (1 << index);
+					m_auraFlags |= (AuraFlags)(1 << index);
 				}
 			}
 
@@ -395,28 +403,33 @@ namespace WCell.RealmServer.Spells.Auras
 					m_startTime = Environment.TickCount;
 
 					int time;
-					if (value < 0)
+
+					// normal timeout
+					if (m_amplitude > 0)
 					{
-						m_maxTicks = int.MaxValue;
+						// periodic
+
+						// no timeout -> infinitely many ticks
+						if (value < 0)
+						{
+							m_maxTicks = int.MaxValue;
+						}
+						else
+						{
+							m_maxTicks = value / m_amplitude;
+
+							if (m_maxTicks < 1)
+							{
+								m_maxTicks = 1;
+							}
+						}
 						time = value % (m_amplitude + 1);
 					}
 					else
 					{
-						if (m_amplitude > 0)
-						{
-							m_maxTicks = value / m_amplitude;
-							time = value % (m_amplitude + 1);
-						}
-						else
-						{
-							time = value;
-						}
-
-						if (m_maxTicks < 1)
-						{
-							m_amplitude = value;
-							m_maxTicks = 1;
-						}
+						// modal aura (either on or off)
+						time = value;
+						m_maxTicks = 1;
 					}
 
 					m_ticks = 0;
@@ -432,7 +445,7 @@ namespace WCell.RealmServer.Spells.Auras
 		public bool CanBeSaved
 		{
 			get;
-			internal set;
+			set;
 		}
 
 		/// <summary>
@@ -516,6 +529,11 @@ namespace WCell.RealmServer.Spells.Auras
 		{
 			get { return m_auraFlags; }
 		}
+
+		public bool HasPeriodicallyUpdatedEffectHandler
+		{
+			get { return m_hasPeriodicallyUpdatedEffectHandler; }
+		}
 		#endregion
 
 		#region Start
@@ -537,7 +555,6 @@ namespace WCell.RealmServer.Spells.Auras
 			}
 
 			SetupTimer();
-
 			Start();
 		}
 
@@ -558,10 +575,8 @@ namespace WCell.RealmServer.Spells.Auras
 			}
 
 			CanBeSaved = this != m_auras.GhostAura &&
-						 !m_spell.AttributesExC.HasFlag(SpellAttributesExC.HonorlessTarget) &&
-						 UsedItem == null &&
-						 (!HasTimeout || TimeLeft > 5000);
-
+			             !m_spell.AttributesExC.HasFlag(SpellAttributesExC.HonorlessTarget) &&
+			             UsedItem == null;
 
 			m_auras.OnAuraChange(this);
 
@@ -618,6 +633,7 @@ namespace WCell.RealmServer.Spells.Auras
 				// only add proc if there is not a custom handler for it
 				m_auras.Owner.AddProcHandler(this);
 			}
+
 			if (m_spell.IsAreaAura && Owner.EntityId == CasterReference.EntityId)
 			{
 				// activate AreaAura
@@ -690,8 +706,8 @@ namespace WCell.RealmServer.Spells.Auras
 			if (m_IsActivated)
 			{
 				OnApply();
-
 				ApplyPeriodicEffects();
+
 				if (!IsAdded)
 				{
 					return;
@@ -790,7 +806,12 @@ namespace WCell.RealmServer.Spells.Auras
 				RemoveNonPeriodicEffects();
 
 				m_CasterReference = caster;
-				if (m_stackCount < m_spell.MaxStackCount)
+
+				if (m_spell.InitialStackCount > 1)
+				{
+					m_stackCount = (byte)m_spell.InitialStackCount;
+				}
+				else if (m_stackCount < m_spell.MaxStackCount)
 				{
 					m_stackCount++;
 				}
@@ -871,17 +892,18 @@ namespace WCell.RealmServer.Spells.Auras
 			{
 				if (caster == CasterReference)
 				{
-					if (spell != Spell &&
-						spell.AuraCasterGroup != null &&
-						spell.AuraCasterGroup == Spell.AuraCasterGroup &&
-						spell.AuraCasterGroup.MaxCount == 1)
+					if (spell != Spell
+						//&&
+						//spell.AuraCasterGroup != null &&
+						//spell.AuraCasterGroup == Spell.AuraCasterGroup &&
+						//spell.AuraCasterGroup.MaxCount == 1
+						)
 					{
-						// same caster group, can override
+						// different spell -> needs to be overridden
 						return AuraOverrideStatus.Replace;
 					}
 					else
 					{
-						// no caster group restriction, but same caster
 						// Aura can be refreshed
 						return AuraOverrideStatus.Refresh;
 					}
@@ -1087,6 +1109,16 @@ namespace WCell.RealmServer.Spells.Auras
 
 		public void Update(int dt)
 		{
+			if (m_hasPeriodicallyUpdatedEffectHandler)
+			{
+				foreach (var handler in m_handlers)
+				{
+					if (handler is PeriodicallyUpdatedAuraEffectHandler)
+					{
+						((PeriodicallyUpdatedAuraEffectHandler)handler).Update();
+					}
+				}
+			}
 			if (m_timer != null)
 			{
 				m_timer.Update(dt);

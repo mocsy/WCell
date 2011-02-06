@@ -142,9 +142,6 @@ namespace WCell.RealmServer.NPCs
 		/// </summary>
 		public NPCSpawnTypeHandler[] SpawnTypeHandlers;
 
-		[NotPersistent]
-		public GossipMenu DefaultGossip { get; set; }
-
 		public bool IsVendor
 		{
 			get { return VendorItems != null; }
@@ -179,16 +176,13 @@ namespace WCell.RealmServer.NPCs
 		/// </summary>
 		public NPCEntry GetEntry(uint difficultyIndex)
 		{
-			if (difficultyIndex != 0)
+			var id = DifficultyOverrideEntryIds.Get(difficultyIndex);
+			if (id != 0)
 			{
-				var id = DifficultyOverrideEntryIds.Get(difficultyIndex - 1);
-				if (id != 0)
+				var entry = NPCMgr.GetEntry(id);
+				if (entry != null)
 				{
-					var entry = NPCMgr.GetEntry(id);
-					if (entry != null)
-					{
-						return entry;
-					}
+					return entry;
 				}
 			}
 			return this;
@@ -295,9 +289,9 @@ namespace WCell.RealmServer.NPCs
 
 		public float OffhandMaxDamage;
 
-		public uint GetRandomHealth()
+		public int GetRandomHealth()
 		{
-			return Utility.Random(MinHealth, MaxHealth);
+			return (int)(Utility.Random(MinHealth, MaxHealth) * NPCMgr.DefaultNPCHealthFactor + 0.999999f);
 		}
 
 		public int GetRandomMana()
@@ -409,6 +403,13 @@ namespace WCell.RealmServer.NPCs
 		public UnitFlags UnitFlags;
 
 		public UnitDynamicFlags DynamicFlags;
+
+		[NotPersistent]
+		public bool IsDead
+		{
+			get { return DynamicFlags.HasFlag(UnitDynamicFlags.Dead); }
+			set { DynamicFlags |= UnitDynamicFlags.Dead; }
+		}
 
 		public UnitExtraFlags ExtraFlags;
 
@@ -885,7 +886,7 @@ namespace WCell.RealmServer.NPCs
 		[NotPersistent]
 		public NPCCreator NPCCreator;
 
-		public NPC Create(uint difficulty = 0u)
+		public NPC Create(uint difficulty = uint.MaxValue)
 		{
 			var npc = NPCCreator(GetEntry(difficulty));
 			npc.SetupNPC(this, null);
@@ -899,10 +900,10 @@ namespace WCell.RealmServer.NPCs
 			return npc;
 		}
 
-		public NPC SpawnAt(Map rgn, Vector3 pos)
+		public NPC SpawnAt(Map map, Vector3 pos)
 		{
-			var npc = Create(rgn.DifficultyIndex);
-			rgn.AddObject(npc, pos);
+			var npc = Create(map.DifficultyIndex);
+			map.AddObject(npc, pos);
 			return npc;
 		}
 
@@ -1111,7 +1112,7 @@ namespace WCell.RealmServer.NPCs
 						}
 						else
 						{
-							parts.Add("(unknown difficulty) = " + id + " (" + (uint) id + ")");
+							parts.Add("(unknown difficulty) = " + id + " (" + (uint)id + ")");
 						}
 					}
 				}

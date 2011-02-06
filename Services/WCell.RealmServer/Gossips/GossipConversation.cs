@@ -16,9 +16,9 @@ namespace WCell.RealmServer.Gossips
 		/// Creates gossip conversation by its fields
 		/// </summary>
 		/// <param name="menu">starting menu</param>
-		/// <param name="speaker">character which started the conversation</param>
-		/// <param name="target">respondent</param>
-		public GossipConversation(GossipMenu menu, Character speaker, WorldObject target) : this(menu, speaker, target, menu.KeepOpen)
+		/// <param name="chr">character which started the conversation</param>
+		/// <param name="speaker">respondent</param>
+		public GossipConversation(GossipMenu menu, Character chr, WorldObject speaker) : this(menu, chr, speaker, menu.KeepOpen)
 		{
 		}
 
@@ -26,13 +26,13 @@ namespace WCell.RealmServer.Gossips
 		/// Creates gossip conversation by its fields
 		/// </summary>
 		/// <param name="menu">starting menu</param>
-		/// <param name="speaker">character which started the conversation</param>
-		/// <param name="target">respondent</param>
-		public GossipConversation(GossipMenu menu, Character speaker, WorldObject target, bool keepOpen)
+		/// <param name="chr">character which started the conversation</param>
+		/// <param name="speaker">respondent</param>
+		public GossipConversation(GossipMenu menu, Character chr, WorldObject speaker, bool keepOpen)
 		{
 			CurrentMenu = menu;
-			Character = speaker;
-			Speaker = target;
+			Character = chr;
+			Speaker = speaker;
 			StayOpen = keepOpen;
 		}
 		#endregion
@@ -92,7 +92,7 @@ namespace WCell.RealmServer.Gossips
 			if (item == null)
 				return;
 
-			if (item.Action != null && item.Action.CanUse(Character))
+			if (item.Action != null && item.Action.CanUse(this))
 			{
 				var menu = CurrentMenu;
 				item.Action.OnSelect(this);
@@ -119,14 +119,12 @@ namespace WCell.RealmServer.Gossips
 
 		/// <summary>
 		/// Shows menu to player
-		/// 
-		/// TODO: Why is this only sending Quest-information? And: Why is this sending Quest information at all?
-		/// TODO: Quest handling should be part of a subclass of GossipMenu or similar
 		/// </summary>
 		/// <param name="menu">menu to show</param>
 		public void DisplayMenu(GossipMenu menu)
 		{
 			CurrentMenu = menu;
+			menu.OnDisplay(this);
 
 			if (Speaker is IQuestHolder && ((IQuestHolder)Speaker).QuestHolderInfo != null)
 			{

@@ -105,55 +105,55 @@ namespace WCell.RealmServer.Global
 		public static bool CanNPCsEvadeDefault = true;
 
 		// 
-		private static int[] updatePriorityTicks = new int[(int)UpdatePriority.End];
+		private static int[] updatePriorityMillis = new int[(int)UpdatePriority.End];
 
 		[NotVariable]
-		public static int[] UpdatePriorityTicks
+		public static int[] UpdatePriorityMillis
 		{
-			get { return updatePriorityTicks; }
+			get { return updatePriorityMillis; }
 			set
 			{
-				updatePriorityTicks = value;
+				updatePriorityMillis = value;
 				SetUpdatePriorityTicks();
 			}
 		}
 
 		static void SetDefaultUpdatePriorityTick(UpdatePriority priority, int ticks)
 		{
-			if (UpdatePriorityTicks[(int)priority] == 0)
+			if (UpdatePriorityMillis[(int)priority] == 0)
 			{
-				UpdatePriorityTicks[(int)priority] = ticks;
+				UpdatePriorityMillis[(int)priority] = ticks;
 			}
 		}
 
 		//[Initialization(InitializationPass.Tenth)]
 		static void SetUpdatePriorityTicks()
 		{
-			if (UpdatePriorityTicks == null)
+			if (UpdatePriorityMillis == null)
 			{
-				UpdatePriorityTicks = new int[(int)UpdatePriority.End];
+				UpdatePriorityMillis = new int[(int)UpdatePriority.End];
 			}
-			else if (UpdatePriorityTicks.Length != (int)UpdatePriority.End)
+			else if (UpdatePriorityMillis.Length != (int)UpdatePriority.End)
 			{
-				Array.Resize(ref updatePriorityTicks, (int)UpdatePriority.End);
+				Array.Resize(ref updatePriorityMillis, (int)UpdatePriority.End);
 			}
 
-			SetDefaultUpdatePriorityTick(UpdatePriority.Inactive, 20);
-			SetDefaultUpdatePriorityTick(UpdatePriority.Background, 10);
-			SetDefaultUpdatePriorityTick(UpdatePriority.VeryLowPriority, 5);
-			SetDefaultUpdatePriorityTick(UpdatePriority.LowPriority, 3);
-			SetDefaultUpdatePriorityTick(UpdatePriority.Active, 2);
-			SetDefaultUpdatePriorityTick(UpdatePriority.HighPriority, 1);
+			SetDefaultUpdatePriorityTick(UpdatePriority.Inactive, 10000);
+			SetDefaultUpdatePriorityTick(UpdatePriority.Background, 3000);
+			SetDefaultUpdatePriorityTick(UpdatePriority.VeryLowPriority, 1000);
+			SetDefaultUpdatePriorityTick(UpdatePriority.LowPriority, 600);
+			SetDefaultUpdatePriorityTick(UpdatePriority.Active, 300);
+			SetDefaultUpdatePriorityTick(UpdatePriority.HighPriority, 0);
 		}
 
 		public static int GetTickCount(UpdatePriority priority)
 		{
-			return UpdatePriorityTicks[(int)priority];
+			return UpdatePriorityMillis[(int)priority];
 		}
 
 		public static void SetTickCount(UpdatePriority priority, int count)
 		{
-			UpdatePriorityTicks[(int)priority] = count;
+			UpdatePriorityMillis[(int)priority] = count;
 		}
 		#endregion
 
@@ -809,6 +809,12 @@ namespace WCell.RealmServer.Global
 			}
 		}
 
+		public bool IsSpawning
+		{
+			get;
+			private set;
+		}
+
 		public bool NPCsSpawned
 		{
 			get { return m_npcsSpawned; }
@@ -838,7 +844,10 @@ namespace WCell.RealmServer.Global
 				m_npcSpawnPools.Add(pool.Template.PoolId, pool);
 				OnPoolAdded<NPCSpawnPoolTemplate, NPCSpawnEntry, NPC, NPCSpawnPoint, NPCSpawnPool>(pool);
 			}
-			pool.IsActive = true;
+			if (SpawnPointsEnabled)
+			{
+				pool.IsActive = true;
+			}
 		}
 
 		public GOSpawnPool AddGOSpawnPool(GOSpawnPoolTemplate templ)
@@ -855,10 +864,14 @@ namespace WCell.RealmServer.Global
 				m_goSpawnPools.Add(pool.Template.PoolId, pool);
 				OnPoolAdded<GOSpawnPoolTemplate, GOSpawnEntry, GameObject, GOSpawnPoint, GOSpawnPool>(pool);
 			}
-			pool.IsActive = true;
+
+			if (SpawnPointsEnabled)
+			{
+				pool.IsActive = true;
+			}
 		}
 
-		static void OnPoolAdded<T, E, O, POINT, POOL>(POOL pool) 
+		static void OnPoolAdded<T, E, O, POINT, POOL>(POOL pool)
 			where T : SpawnPoolTemplate<T, E, O, POINT, POOL>
 			where E : SpawnEntry<T, E, O, POINT, POOL>
 			where O : WorldObject
@@ -955,7 +968,7 @@ namespace WCell.RealmServer.Global
 			for (var i = 0; i < objs.Length; i++)
 			{
 				var obj = objs[i];
-				if (!(obj is Character) && !obj.IsOwnedByPlayer)
+				if (!(obj is Character) && !obj.IsOwnedByPlayer && !obj.IsDeleted)
 				{
 					// only delete things that are not Characters or belong to Characters
 					obj.DeleteNow();
@@ -980,6 +993,7 @@ namespace WCell.RealmServer.Global
 			}
 		}
 
+		#region SpawnMap
 		/// <summary>
 		/// If not added already, this method adds all default GameObjects and NPC spawnpoints to this map.
 		/// </summary>
@@ -999,8 +1013,10 @@ namespace WCell.RealmServer.Global
 
 			if (!IsSpawned)
 			{
+				IsSpawning = true;
 				if (!m_MapTemplate.NotifySpawning(this))
 				{
+					IsSpawning = false;
 					return;
 				}
 
@@ -1034,6 +1050,8 @@ namespace WCell.RealmServer.Global
 						m_npcsSpawned = true;
 					}
 				}
+
+				IsSpawning = false;
 
 				if (IsSpawned)
 				{
@@ -1072,6 +1090,34 @@ namespace WCell.RealmServer.Global
 			}
 		}
 
+		private bool m_SpawnPointsEnabled = true;
+
+		public bool SpawnPointsEnabled
+		{
+			get { return m_SpawnPointsEnabled; }
+			set
+			{
+				if (m_SpawnPointsEnabled == value) return;
+
+				m_SpawnPointsEnabled = value;
+				if (value)
+				{
+					// enable all spawn points
+					ForeachSpawnPool(pool => pool.IsActive = true);
+				}
+				else
+				{
+					// disable all spawn points
+					ForeachSpawnPool(pool =>
+					{
+						pool.Disable();
+					});
+				}
+			}
+		}
+
+		#endregion
+
 		public void ForeachSpawnPool(Action<NPCSpawnPool> func)
 		{
 			ForeachSpawnPool(Vector3.Zero, 0, func);
@@ -1082,7 +1128,7 @@ namespace WCell.RealmServer.Global
 			var radiusSq = radius * radius;
 			foreach (var pool in m_npcSpawnPools.Values)
 			{
-				if (pool.Template.Entries.Any(spawn => radius <= 0 || spawn.GetDistSq(pos) < radiusSq))
+				if (radius <= 0 || pool.Template.Entries.Any(spawn => spawn.GetDistSq(pos) < radiusSq))
 				{
 					func(pool);
 				}
@@ -1235,27 +1281,6 @@ namespace WCell.RealmServer.Global
 					}
 				}
 
-				for (var i = m_characters.Count - 1; i >= 0; i--)
-				{
-					var chr = m_characters[i];
-
-					// process all the Character messages
-					IMessage msg;
-
-					while (chr.MessageQueue.TryDequeue(out msg))
-					{
-						try
-						{
-							msg.Execute();
-						}
-						catch (Exception e)
-						{
-							LogUtil.ErrorException(e, "Exception raised when processing Message for: {0}", chr);
-							chr.Client.Disconnect();
-						}
-					}
-				}
-
 				// check to see if it's time to run a map update yet again
 				//if (m_lastMapUpdate + DefaultUpdateDelay <= now)
 
@@ -1301,23 +1326,16 @@ namespace WCell.RealmServer.Global
 						priority = UpdatePriority.HighPriority;
 					}
 
-					var tickMatch = m_tickCount + obj.GetUInt32(ObjectFields.GUID_2);
-
 					try
 					{
 						// Update Object
-						var ticks = UpdatePriorityTicks[(int)priority];
-						if (tickMatch % ticks == 0)
+						var minObjUpdateDelta = UpdatePriorityMillis[(int)priority];
+						var objUpdateDelta = (updateStart - obj.LastUpdateTime).ToMilliSecondsInt();
+
+						if (objUpdateDelta >= minObjUpdateDelta)
 						{
-							if (ticks > 1)
-							{
-								// TODO: Fix exact amount of passed time
-								obj.Update(updateDelta + (((ticks - 1) * m_updateDelay)));
-							}
-							else
-							{
-								obj.Update(updateDelta);
-							}
+							obj.LastUpdateTime = updateStart;
+							obj.Update(objUpdateDelta);
 						}
 					}
 					catch (Exception e)
@@ -1938,7 +1956,7 @@ namespace WCell.RealmServer.Global
 				{
 					if (obj is Character)
 					{
-						MiscHandler.SendInitWorldStates((Character)obj, DefaultZone.WorldStates, DefaultZone);
+						WorldStateHandler.SendInitWorldStates((Character)obj, DefaultZone.WorldStates, DefaultZone);
 					}
 				}
 
@@ -2349,11 +2367,11 @@ namespace WCell.RealmServer.Global
 		}
 		#endregion
 
-        /// <summary>
-        /// Checks if the event is currently active
-        /// </summary>
-        /// <param name="eventId">Id of the event to check</param>
-        /// <returns></returns>
+		/// <summary>
+		/// Checks if the event is currently active
+		/// </summary>
+		/// <param name="eventId">Id of the event to check</param>
+		/// <returns></returns>
 		public bool IsEventActive(uint eventId)
 		{
 			return WorldEventMgr.IsEventActive(eventId);

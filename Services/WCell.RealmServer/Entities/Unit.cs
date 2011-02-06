@@ -325,6 +325,9 @@ namespace WCell.RealmServer.Entities
 			}
 		}
 
+		/// <summary>
+		/// Whether this is a ghost
+		/// </summary>
 		public bool IsGhost
 		{
 			get { return m_auras.GhostAura != null; }
@@ -1087,24 +1090,34 @@ namespace WCell.RealmServer.Entities
 		/// Checks whether this Unit can currently see the given obj
 		/// 
 		/// TODO: Higher staff ranks can always see lower staff ranks (too bad there are no ranks)
-		/// TODO: Stealth detection
+		/// TODO: Line of Sight
 		/// </summary>
 		public override bool CanSee(WorldObject obj)
 		{
-			if (!base.CanSee(obj))
+			if (!base.CanSee(obj) || !obj.IsInWorld)
 			{
 				return false;
 			}
 
-			if (!obj.IsInWorld)
+			if (this == obj)			// one can always see oneself
+			{
+				return true;
+			}
+
+			// check for visibility overrides
+			var visibility = obj.DetermineVisibilityFor(this);
+			if (visibility == VisibilityStatus.Invisible)
 			{
 				return false;
 			}
+			if (visibility == VisibilityStatus.Visible)
+			{
+				return true;
+			}
 
-			if (this == obj ||												// one can always see oneself		
-				(this is Character && ((Character)this).Role.IsStaff &&
-				(!(obj is Character) || ((Character)obj).Role < ((Character)this).Role)))
-			{	// GMs see everything (just don't display the Spirit Healer to the living - because it is too confusing)
+			if (this is Character && ((Character)this).Role.IsStaff && (!(obj is Character) || ((Character)obj).Role < ((Character)this).Role))
+			{	
+				// GMs see everything (just don't display the Spirit Healer to the living - because it is too confusing)
 				return !(obj is Unit) || !((Unit)obj).IsSpiritHealer || !IsAlive;
 			}
 
@@ -1114,7 +1127,21 @@ namespace WCell.RealmServer.Entities
 				return true;
 			}
 
-			var unit = obj as Unit;
+			// Unit
+			var unit = (Unit)obj;
+			if (IsGhost)
+			{
+				// dead can only see the dead and those near their corpse!
+				if (this is Character)
+				{
+					var corpse = ((Character)this).Corpse;
+					if (corpse != null)
+					{
+						return unit.IsInRadiusSq(corpse, Corpse.GhostVisibilityRadiusSq);
+					}
+				}
+				return false;
+			}
 
 			if (obj is Character)
 			{
@@ -1139,33 +1166,63 @@ namespace WCell.RealmServer.Entities
 				return IsGhost;
 			}
 
-			if (IsGhost)
-			{
-				// dead can only see the dead and those near their corpse!
-				if (this is Character)
-				{
-					var corpse = ((Character)this).Corpse;
-					if (corpse != null)
-					{
-						return unit.IsInRadiusSq(corpse, Corpse.GhostVisibilityRadiusSq);
-					}
-				}
-				return false;
-			}
+			return HandleStealthDetection(unit);	
 
+		}
+		public bool HandleStealthDetection(Unit unit)
+		{
 			var val = unit.Stealthed;
 			if (val > 0)
 			{
 				// stealthed Unit
 				// TODO: Calc detection, based on Stealth value, boni, detection, detection boni, distance and viewing angle
+
+				//if we are stunned we don't see anything
+				if ((this.UnitFlags & UnitFlags.Stunned) != 0)
+					return false;
+
+				//he's so close we can allready touch him
+				if (GetDistance(unit.Position) <= 0.24f)
+					return true;
+
+				//he's behind us, we can't see him
+				if (!unit.IsInFrontOf(this))
+					return false;
+
+				bool HasStealthDetection = false;
+				
+				//check if we have a stealth detection aura
+				if (Auras.GetTotalAuraModifier(AuraType.Aura_228) > 0)
+					HasStealthDetection = true;
+
+				float visibleDistance;
+				//we have no stealth detection so check how stealthy he is
+				if (!HasStealthDetection)
+				{
+					visibleDistance = 10.5f - (((float)unit.Stealthed) / 100.0f);
+					// -1.0f per level diff
+					visibleDistance += this.Level - unit.Level;
+
+					//ModStealthLevel -> auras that increase his stealth
+					var stealthMod = Auras.GetTotalAuraModifier(AuraType.ModStealthLevel);
+					if (stealthMod < 0)
+						stealthMod = 0;
+					//ModDetect -> auras that we have that decrease his stealth
+					//every 5 mod he can get closer by 1.0f 
+					var DetectMod = Auras.GetTotalAuraModifier(AuraType.ModDetect, 0);
+					visibleDistance -= ((DetectMod - stealthMod) / 5.0f);
+					visibleDistance = visibleDistance > 45.0f ? 45.0f : visibleDistance;
+
+					//we see you!
+					if (GetDistance(unit.Position) <= visibleDistance)
+						return true;
+				}
+				else
+					return true;
+
 				return false;
 			}
-
 			return true;
-		}
-
-		public void OnStealth()
-		{
 		}
 		#endregion
 
