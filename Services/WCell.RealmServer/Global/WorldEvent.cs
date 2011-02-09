@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using WCell.Constants;
+using WCell.Constants.NPCs;
 using WCell.Constants.Quests;
 using WCell.Constants.Spells;
 using WCell.RealmServer.Lang;
@@ -87,45 +88,54 @@ namespace WCell.RealmServer.Global
             Occurence = TimeSpan.FromMinutes(_Occurence);
             Duration = TimeSpan.FromMinutes(_Length);
 
-            var time = DateTime.Now;
-
-            //Only work out start times for events that will ever be able to start
-            if (time < Until)
-            {
-                //If the first time this event can start is in the
-                //future then this is easy
-                if (From > time)
-                    TimeUntilNextStart = From - time;
-                else
-                {
-                    //If the first time this event started was in the
-                    //past work out which cycle of the event we are up
-                    //to
-                    DateTime timeToCheck = From;
-                    while (timeToCheck < time)
-                    {
-                        //if we are in the middle of a cycle
-                        if ((timeToCheck + Duration) > time && (timeToCheck + Duration) < (timeToCheck + Occurence))
-                            break;
-
-                        timeToCheck += Occurence;
-                    }
-                    TimeUntilNextStart = timeToCheck - time;
-                }
-                
-                TimeUntilEnd = TimeUntilNextStart + Duration;
-            }
+            CalculateEventDelays(this);
 
             WorldEventMgr.AddEvent(this);
         }
-    }
+
+	    public static void CalculateEventDelays(WorldEvent worldEvent)
+	    {
+	        var time = DateTime.Now;
+
+	        //Only work out start times for events that will ever be able to start
+            if (time < worldEvent.Until)
+	        {
+	            //If the first time this event can start is in the
+	            //future then this is easy
+                if (worldEvent.From > time)
+                    worldEvent.TimeUntilNextStart = worldEvent.From - time;
+	            else
+	            {
+	                //If the first time this event started was in the
+	                //past work out which cycle of the event we are up
+	                //to
+                    DateTime timeToCheck = worldEvent.From;
+	                while (timeToCheck < time)
+	                {
+	                    //if we are in the middle of a cycle
+                        if ((timeToCheck + worldEvent.Duration) > time && (timeToCheck + worldEvent.Duration) < (timeToCheck + worldEvent.Occurence))
+	                        break;
+
+                        timeToCheck += worldEvent.Occurence;
+	                }
+                    worldEvent.TimeUntilNextStart = timeToCheck - time;
+	            }
+
+                worldEvent.TimeUntilEnd = worldEvent.TimeUntilNextStart + worldEvent.Duration;
+	        }
+            else
+            {
+                worldEvent.TimeUntilNextStart = null;
+                worldEvent.TimeUntilEnd = null;
+            }
+	    }
+	}
 
     /// <summary>
 	/// Holds all information regarding a spawn
 	/// involved in a WorldEvent
 	/// </summary>
-    [DataHolder]
-    public class WorldEventNPC : IDataHolder
+    public class WorldEventNPC
     {
         /// <summary>
         /// Spawn id of the object
@@ -134,11 +144,28 @@ namespace WCell.RealmServer.Global
 
         /// <summary>
         /// ID of the world event relating to this entry
+        /// as found in the database, negative values mean
+        /// we should despawn
         /// </summary>
+        public int _eventId;
+
+        /// <summary>
+        /// ID of the world event relating to this entry
+        /// </summary>
+        [NotPersistent]
         public uint EventId;
+
+        /// <summary>
+        /// True if we should spawn this entry
+        /// False if we should despawn it
+        /// </summary>
+        [NotPersistent]
+        public bool Spawn;
 
         public void FinalizeDataHolder()
         {
+            Spawn = _eventId > 0;
+            EventId = (uint)_eventId;
             var worldEvent = WorldEventMgr.GetEvent(EventId);
             if (worldEvent == null)
                 return;
@@ -151,8 +178,7 @@ namespace WCell.RealmServer.Global
     /// Holds all information regarding a spawn
     /// involved in a WorldEvent
     /// </summary>
-    [DataHolder]
-    public class WorldEventGameObject : IDataHolder
+    public class WorldEventGameObject
     {
         /// <summary>
         /// Spawn id of the object
@@ -161,11 +187,28 @@ namespace WCell.RealmServer.Global
 
         /// <summary>
         /// ID of the world event relating to this entry
+        /// as found in the database, negative values mean
+        /// we should despawn
         /// </summary>
+        public int _eventId;
+
+        /// <summary>
+        /// ID of the world event relating to this entry
+        /// </summary>
+        [NotPersistent]
         public uint EventId;
+
+        /// <summary>
+        /// True if we should spawn this entry
+        /// False if we should despawn it
+        /// </summary>
+        [NotPersistent]
+        public bool Spawn;
 
         public void FinalizeDataHolder()
         {
+            Spawn = _eventId > 0;
+            EventId = (uint)_eventId;
             var worldEvent = WorldEventMgr.GetEvent(EventId);
             if (worldEvent != null)
                 worldEvent.GOSpawns.Add(this);
@@ -184,13 +227,21 @@ namespace WCell.RealmServer.Global
         /// </summary>
         public uint Guid;
 
+        public NPCId EntryId;
+
+        [NotPersistent]
+        public NPCId OriginalEntryId;
+
         public uint ModelId;
 
         public uint EquipmentId;
 
-        public SpellId spell_start;
+        [NotPersistent]
+        public uint OriginalEquipmentId;
 
-        public SpellId spell_end;
+        public SpellId SpellIdToCastAtStart;
+
+        public SpellId SpellIdToCastAtEnd;
 
         /// <summary>
         /// ID of the world event relating to this entry

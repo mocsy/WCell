@@ -8,8 +8,11 @@ using WCell.Constants.Quests;
 using WCell.Core.Initialization;
 using WCell.Core.Timers;
 using WCell.RealmServer.Content;
+using WCell.RealmServer.GameObjects;
 using WCell.RealmServer.NPCs;
+using WCell.RealmServer.NPCs.Spawns;
 using WCell.RealmServer.Quests;
+using WCell.RealmServer.Spells;
 using WCell.Util;
 using WCell.Util.Threading.TaskParallel;
 
@@ -69,10 +72,8 @@ namespace WCell.RealmServer.Global
 
                 Log.Debug("{0} World Events loaded.", _eventCount);
                 
-                // start updating
-                //TODO: Enable this
-                //Disabled for now, no point updating nothing!!!
-                //Task.Factory.StartNewDelayed(30000, Update);
+                // Add the Update method to the world task queue
+                World.TaskQueue.CallPeriodically(10000, Update);
             }
             return true;
         }
@@ -99,8 +100,10 @@ namespace WCell.RealmServer.Global
 
         public static void Update()
         {
-            if (!Loaded)
+            if (!Loaded || !QuestMgr.Loaded || !NPCMgr.Loaded || !GOMgr.Loaded)
+            {
                 return;
+            }
 
             var updateInterval = DateTime.Now - LastUpdateTime;
             LastUpdateTime = DateTime.Now;
@@ -112,12 +115,9 @@ namespace WCell.RealmServer.Global
 
                 if (worldEvent.TimeUntilEnd <= TimeSpan.Zero)
                     StopEvent(worldEvent);
-
-                if (worldEvent.TimeUntilNextStart <= TimeSpan.Zero)
+                else if (worldEvent.TimeUntilNextStart <= TimeSpan.Zero)
                     StartEvent(worldEvent);
             }
-
-            Task.Factory.StartNewDelayed(1000, Update);
         }
 
 	    #endregion
@@ -149,12 +149,15 @@ namespace WCell.RealmServer.Global
 
         public static void StartEvent(WorldEvent worldEvent)
         {
-            Log.Info("Starting event {0}: {1}", worldEvent.Id, worldEvent.Description);
+            Log.Debug("Incrementing start event timer {0}: {1}", worldEvent.Id, worldEvent.Description);
+            worldEvent.TimeUntilNextStart += worldEvent.Occurence;
             if (IsEventActive(worldEvent.Id))
                 return;
-            
-            worldEvent.TimeUntilNextStart = worldEvent.Occurence;
+
+            Log.Info("Starting event {0}: {1}", worldEvent.Id, worldEvent.Description);
             ArrayUtil.Set(ref ActiveEvents, worldEvent.Id, worldEvent);
+            SpawnEvent(worldEvent);
+            ApplyEventNPCData(worldEvent);
         }
 
         public static bool StopEvent(uint id)
@@ -169,15 +172,19 @@ namespace WCell.RealmServer.Global
 
         public static void StopEvent(WorldEvent worldEvent)
         {
-            Log.Info("Stopping event {0}: {1}", worldEvent.Id, worldEvent.Description);
+            Log.Debug("Incrementing end event timer {0}: {1}", worldEvent.Id, worldEvent.Description);
+            worldEvent.TimeUntilEnd += worldEvent.Occurence + worldEvent.Duration;
             if (!IsEventActive(worldEvent.Id))
                 return;
 
-            worldEvent.TimeUntilEnd = worldEvent.Occurence + worldEvent.Duration;
+            Log.Info("Stopping event {0}: {1}", worldEvent.Id, worldEvent.Description);
             ActiveEvents[worldEvent.Id] = null;
 
             if(worldEvent.QuestIds.Count != 0)
                 ClearActiveQuests(worldEvent.QuestIds);
+
+            DeSpawnEvent(worldEvent);
+            ResetEventNPCData(worldEvent);
         }
 		#endregion
 
@@ -198,6 +205,229 @@ namespace WCell.RealmServer.Global
                                              }
                                          }
                     );
+        }
+
+        public static void SpawnEvent(uint eventId)
+        {
+            var worldEvent = GetEvent(eventId);
+            SpawnEvent(worldEvent);
+        }
+
+        public static void DeSpawnEvent(uint eventId)
+        {
+            var worldEvent = GetEvent(eventId);
+            DeSpawnEvent(worldEvent);
+        }
+
+        private static void SpawnEvent(WorldEvent worldEvent)
+        {
+
+            foreach (var worldEventNPC in worldEvent.NPCSpawns)
+            {
+                var spawnEntry = NPCMgr.GetSpawnEntry(worldEventNPC.Guid);
+                var map = spawnEntry.Map;
+
+                //if the map is null then this saves us some work
+                //since the map will spawn any active events when
+                //it is created
+                if (map == null)
+                    continue;
+
+                if (worldEventNPC.Spawn)
+                {
+                    map.AddNPCSpawnPoolLater(spawnEntry.PoolTemplate);
+                }
+                else
+                {
+
+                    foreach (var point in spawnEntry.SpawnPoints.ToArray())
+                    {
+                        point.Disable();
+                    }
+                }
+
+
+            }
+
+            foreach (var worldEventGO in worldEvent.GOSpawns)
+            {
+                var spawnEntry = GOMgr.GetSpawnEntry(worldEventGO.Guid);
+                var map = spawnEntry.Map;
+
+                //if the map is null then this saves us some work
+                //since the map will spawn any active events when
+                //it is created
+                if (map == null)
+                    continue;
+
+                if (worldEventGO.Spawn)
+                {
+                    map.AddGOSpawnPoolLater(spawnEntry.PoolTemplate);
+                }
+                else
+                {
+
+                    foreach (var point in spawnEntry.SpawnPoints.ToArray())
+                    {
+                        point.Disable();
+                    }
+                }
+            }
+        }
+
+        private static void DeSpawnEvent(WorldEvent worldEvent)
+        {
+            foreach (var worldEventNPC in worldEvent.NPCSpawns)
+            {
+                var spawnEntry = NPCMgr.GetSpawnEntry(worldEventNPC.Guid);
+                var map = spawnEntry.Map;
+
+                //if the map is null then this saves us some work
+                //since the map wont spawn any inactive events when
+                //it is created
+                if (map == null)
+                    continue;
+
+                if (worldEventNPC.Spawn)
+                {
+                    map.RemoveNPCSpawnPoolLater(spawnEntry.PoolTemplate);
+                }
+                else
+                {
+
+                    foreach (var point in spawnEntry.SpawnPoints.ToArray())
+                    {
+                        point.Respawn();
+                    }
+                }
+            }
+
+            foreach (var worldEventGO in worldEvent.GOSpawns)
+            {
+                var spawnEntry = GOMgr.GetSpawnEntry(worldEventGO.Guid);
+                var map = spawnEntry.Map;
+
+                //if the map is null then this saves us some work
+                //since the map wont spawn any inactive events when
+                //it is created
+                if (map == null)
+                    continue;
+
+                if (worldEventGO.Spawn)
+                {
+                    map.RemoveGOSpawnPoolLater(spawnEntry.PoolTemplate);
+                }
+                else
+                {
+
+                    foreach (var point in spawnEntry.SpawnPoints.ToArray())
+                    {
+                        point.Respawn();
+                    }
+                }
+            }
+        }
+
+        private static void ApplyEventNPCData(WorldEvent worldEvent)
+        {
+
+            foreach (var eventNpcData in worldEvent.ModelEquips)
+            {
+                var spawnEntry = NPCMgr.GetSpawnEntry(eventNpcData.Guid);
+                if(spawnEntry == null)
+                {
+                    Log.Warn("Invalid Spawn Entry in World Event NPC Data, Entry: {0}", eventNpcData.Guid);
+                    continue;
+                }
+
+                if(eventNpcData.EntryId != 0)
+                {
+                    eventNpcData.OriginalEntryId = spawnEntry.EntryId;
+                    spawnEntry.EntryId = eventNpcData.EntryId;
+
+                    spawnEntry.Entry = NPCMgr.GetEntry(spawnEntry.EntryId);
+                    if (spawnEntry.Entry == null)
+                    {
+                        Log.Warn("{0} had an invalid World Event EntryId.", spawnEntry);
+                        spawnEntry.EntryId = eventNpcData.OriginalEntryId;
+                        spawnEntry.Entry = NPCMgr.GetEntry(spawnEntry.EntryId);
+                    }
+                }
+
+                if (eventNpcData.ModelId != 0)
+                {
+                    spawnEntry.DisplayIdOverride = eventNpcData.ModelId;
+                }
+
+                if(eventNpcData.EquipmentId != 0)
+                {
+                    eventNpcData.OriginalEquipmentId = spawnEntry.EquipmentId;
+                    spawnEntry.EquipmentId = eventNpcData.EquipmentId;
+
+                    spawnEntry.Equipment = NPCMgr.GetEquipment(spawnEntry.EquipmentId);
+                }
+                
+                foreach (var point in spawnEntry.SpawnPoints.ToArray().Where(point => point.IsActive))
+                {
+                    point.Respawn();
+                    if (eventNpcData.SpellIdToCastAtStart == 0)
+                        continue;
+                    
+                    Spell spell = SpellHandler.Get(eventNpcData.SpellIdToCastAtStart);
+                    if (spell == null)
+                        continue;
+
+                    SpellCast cast = point.ActiveSpawnling.SpellCast;
+                    cast.Start(spell);
+                }
+            }
+        }
+
+        private static void ResetEventNPCData(WorldEvent worldEvent)
+        {
+
+            foreach (var eventNpcData in worldEvent.ModelEquips)
+            {
+                var spawnEntry = NPCMgr.GetSpawnEntry(eventNpcData.Guid);
+                if (spawnEntry == null)
+                {
+                    Log.Warn("Invalid Spawn Entry in World Event NPC Data, Entry: {0}", eventNpcData.Guid);
+                    continue;
+                }
+
+                if (eventNpcData.EntryId != 0)
+                {
+                    spawnEntry.EntryId = eventNpcData.OriginalEntryId;
+                    spawnEntry.Entry = NPCMgr.GetEntry(spawnEntry.EntryId);
+                }
+
+                if (eventNpcData.ModelId != 0)
+                {
+                    spawnEntry.DisplayIdOverride = 0;
+                }
+
+                if (eventNpcData.EquipmentId != 0)
+                {
+                    spawnEntry.EquipmentId = eventNpcData.OriginalEquipmentId;
+
+                    spawnEntry.Equipment = NPCMgr.GetEquipment(spawnEntry.EquipmentId);
+                }
+                
+                foreach (var point in spawnEntry.SpawnPoints.ToArray().Where(point => point.IsActive))
+                {
+                    point.Respawn();
+
+                    if (eventNpcData.SpellIdToCastAtEnd == 0)
+                        continue;
+
+                    Spell spell = SpellHandler.Get(eventNpcData.SpellIdToCastAtEnd);
+                    if (spell != null)
+                    {
+                        SpellCast cast = point.ActiveSpawnling.SpellCast;
+                        cast.Start(spell);
+                    }
+                }
+            }
         }
         #endregion
 

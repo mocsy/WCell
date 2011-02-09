@@ -201,6 +201,8 @@
     <Compile Include="Achievements\AchievementProgressRecord.cs" />
     <Compile Include="Achievements\AchievementCriteriaRequirement.cs" />
     <Compile Include="Achievements\AchievementReward.cs" />
+    <Compile Include="Commands\WorldEventCommands.cs" />
+    <Compile Include="Content\IModDataHolder.cs" />
     <Compile Include="Editor\Commands\EditorCommand.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -282,6 +284,7 @@
     <Compile Include="Spawns\SpawnPoolTemplate.cs" />
     <Compile Include="Spawns\SpawnPool.cs" />
     <Compile Include="Spawns\SpawnPoolTemplateEntry.cs" />
+    <Compile Include="Spells\Auras\Mod\ModArmorByPercentOfIntellectHandler.cs" />
     <Compile Include="Spells\Auras\Misc\AddProcHandler.cs" />
     <Compile Include="Spells\Auras\Mod\ModAttackerSpellCritChanceHandler.cs" />
     <Compile Include="Spells\SpellCast.AI.cs" />

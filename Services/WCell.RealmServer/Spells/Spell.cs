@@ -404,8 +404,8 @@ namespace WCell.RealmServer.Spells
 				}
 			}
 
-			RequiresDeadTarget =
-				TargetFlags.HasAnyFlag(SpellTargetFlags.Corpse | SpellTargetFlags.PvPCorpse | SpellTargetFlags.UnitCorpse);
+			RequiresDeadTarget = HasEffect(SpellEffectType.Resurrect) || HasEffect(SpellEffectType.ResurrectFlat) || HasEffect(SpellEffectType.SelfResurrect);
+				// unreliable: TargetFlags.HasAnyFlag(SpellTargetFlags.Corpse | SpellTargetFlags.PvPCorpse | SpellTargetFlags.UnitCorpse);
 
 			CostsPower = PowerCost > 0 || PowerCostPercentage > 0;
 
@@ -515,7 +515,7 @@ namespace WCell.RealmServer.Spells
 				SkillTier = SkillTierId.End;
 			}
 
-			ArrayUtil.PruneVals(ref RequiredTotemCategories);
+			ArrayUtil.PruneVals(ref RequiredToolCategories);
 
 			ForeachEffect(effect =>
 			              	{
@@ -1375,10 +1375,10 @@ namespace WCell.RealmServer.Spells
 				writer.WriteLine(indent + "DamageMultipliers: " + DamageMultipliers.ToString(", "));
 			}
 
-			for (int i = 0; i < RequiredTotemCategories.Length; i++)
+			for (int i = 0; i < RequiredToolCategories.Length; i++)
 			{
-				if (RequiredTotemCategories[i] != 0)
-					writer.WriteLine(indent + "RequiredTotemCategoryId[" + i + "]: " + RequiredTotemCategories[i]);
+				if (RequiredToolCategories[i] != 0)
+					writer.WriteLine(indent + "RequiredTotemCategoryId[" + i + "]: " + RequiredToolCategories[i]);
 			}
 
 			if ((int)AreaGroupId != 0)

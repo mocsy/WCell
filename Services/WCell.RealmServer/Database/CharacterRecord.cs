@@ -8,28 +8,27 @@ using NHibernate.Criterion;
 using NLog;
 using WCell.Constants;
 using WCell.Constants.Login;
+using WCell.Constants.NPCs;
 using WCell.Constants.Spells;
 using WCell.Constants.Updates;
 using WCell.Constants.World;
 using WCell.Core;
 using WCell.Core.Database;
 using WCell.RealmServer.Achievements;
-using WCell.RealmServer.NPCs.Pets;
-using WCell.RealmServer.Talents;
-using WCell.Util.Threading;
 using WCell.RealmServer.Entities;
+using WCell.RealmServer.Global;
+using WCell.RealmServer.Groups;
+using WCell.RealmServer.Guilds;
+using WCell.RealmServer.Instances;
 using WCell.RealmServer.Interaction;
+using WCell.RealmServer.Mail;
+using WCell.RealmServer.NPCs;
+using WCell.RealmServer.NPCs.Pets;
 using WCell.RealmServer.RacesClasses;
+using WCell.RealmServer.Talents;
 using WCell.Util;
 using WCell.Util.NLog;
-using WCell.RealmServer.Global;
-using WCell.RealmServer.Instances;
-using WCell.RealmServer.Groups;
-using WCell.Constants.NPCs;
-using WCell.RealmServer.NPCs;
-using WCell.RealmServer.Mail;
-using WCell.RealmServer.Guilds;
-using System.Collections.Generic;
+using WCell.Util.Threading;
 
 using Alias = System.Collections.Generic.KeyValuePair<string, string>;
 
@@ -1042,7 +1041,7 @@ namespace WCell.RealmServer.Database
 		#region Delete
 		public void DeleteLater()
 		{
-			RealmServer.Instance.AddMessage(new Message(Delete));
+			RealmServer.IOQueue.AddMessage(new Message(Delete));
 		}
 
 		public override void Delete()
@@ -1068,7 +1067,7 @@ namespace WCell.RealmServer.Database
 
 		public static void DeleteChar(uint charId)
 		{
-			RealmServer.Instance.ExecuteInContext(() =>
+			RealmServer.IOQueue.ExecuteInContext(() =>
 			{
 				var chr = World.GetCharacter(charId);
 				uint guildId;

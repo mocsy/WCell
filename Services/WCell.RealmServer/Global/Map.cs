@@ -825,6 +825,34 @@ namespace WCell.RealmServer.Global
 			get { return m_gosSpawned; }
 		}
 
+        public void RemoveNPCSpawnPoolLater(NPCSpawnPoolTemplate templ)
+        {
+            AddMessage(() => RemoveNPCSpawnPoolNow(templ));
+        }
+
+        public void RemoveNPCSpawnPoolNow(NPCSpawnPoolTemplate templ)
+        {
+            NPCSpawnPool existingPool;
+            if (m_npcSpawnPools.TryGetValue(templ.PoolId, out existingPool))
+            {
+                existingPool.RemovePoolNow();
+            }
+        }
+
+        public void RemoveGOSpawnPoolLater(GOSpawnPoolTemplate templ)
+        {
+            AddMessage(() => RemoveGOSpawnPoolNow(templ));
+        }
+
+        public void RemoveGOSpawnPoolNow(GOSpawnPoolTemplate templ)
+        {
+            GOSpawnPool existingPool;
+            if (m_goSpawnPools.TryGetValue(templ.PoolId, out existingPool))
+            {
+                existingPool.RemovePoolNow();
+            }
+        }
+
 		public void AddNPCSpawnPoolLater(NPCSpawnPoolTemplate templ)
 		{
 			AddMessage(() => AddNPCSpawnPoolNow(templ));
@@ -839,10 +867,15 @@ namespace WCell.RealmServer.Global
 
 		public void AddNPCSpawnPoolNow(NPCSpawnPool pool)
 		{
-			if (!m_npcSpawnPools.ContainsKey(pool.Template.PoolId))
+			NPCSpawnPool existingPool;
+			if (!m_npcSpawnPools.TryGetValue(pool.Template.PoolId, out existingPool))
 			{
 				m_npcSpawnPools.Add(pool.Template.PoolId, pool);
 				OnPoolAdded<NPCSpawnPoolTemplate, NPCSpawnEntry, NPC, NPCSpawnPoint, NPCSpawnPool>(pool);
+			}
+			else
+			{
+				pool = existingPool;
 			}
 			if (SpawnPointsEnabled)
 			{
@@ -850,19 +883,29 @@ namespace WCell.RealmServer.Global
 			}
 		}
 
-		public GOSpawnPool AddGOSpawnPool(GOSpawnPoolTemplate templ)
+        public void AddGOSpawnPoolLater(GOSpawnPoolTemplate templ)
+        {
+            AddMessage(() => AddGOSpawnPoolNow(templ));
+        }
+
+		public GOSpawnPool AddGOSpawnPoolNow(GOSpawnPoolTemplate templ)
 		{
 			var pool = new GOSpawnPool(this, templ);
-			AddGOSpawnPool(pool);
+			AddGOSpawnPoolNow(pool);
 			return pool;
 		}
 
-		public void AddGOSpawnPool(GOSpawnPool pool)
+		public void AddGOSpawnPoolNow(GOSpawnPool pool)
 		{
-			if (!m_goSpawnPools.ContainsKey(pool.Template.PoolId))
+			GOSpawnPool existingPool;
+			if (!m_goSpawnPools.TryGetValue(pool.Template.PoolId, out existingPool))
 			{
 				m_goSpawnPools.Add(pool.Template.PoolId, pool);
 				OnPoolAdded<GOSpawnPoolTemplate, GOSpawnEntry, GameObject, GOSpawnPoint, GOSpawnPool>(pool);
+			}
+			else
+			{
+				pool = existingPool;
 			}
 
 			if (SpawnPointsEnabled)
@@ -1069,7 +1112,7 @@ namespace WCell.RealmServer.Global
 				{
 					if (templ.AutoSpawns && IsEventActive(templ.EventId))
 					{
-						AddGOSpawnPool(templ);
+						AddGOSpawnPoolNow(templ);
 					}
 				}
 			}
@@ -1262,22 +1305,17 @@ namespace WCell.RealmServer.Global
 				var updateStart = DateTime.Now;
 				var updateDelta = (updateStart - m_lastUpdateTime).ToMilliSecondsInt();
 
-				// see if we have any messages to execute
-				if (m_messageQueue.Count > 0)
+				// process all the messages
+				IMessage msg;
+				while (m_messageQueue.TryDequeue(out msg))
 				{
-					// process all the messages
-					IMessage msg;
-
-					while (m_messageQueue.TryDequeue(out msg))
+					try
 					{
-						try
-						{
-							msg.Execute();
-						}
-						catch (Exception e)
-						{
-							LogUtil.ErrorException(e, "Exception raised when processing Message.");
-						}
+						msg.Execute();
+					}
+					catch (Exception e)
+					{
+						LogUtil.ErrorException(e, "Exception raised when processing Message.");
 					}
 				}
 
@@ -1329,7 +1367,7 @@ namespace WCell.RealmServer.Global
 					try
 					{
 						// Update Object
-						var minObjUpdateDelta = UpdatePriorityMillis[(int)priority];
+						var minObjUpdateDelta = UpdatePriorityMillis[(int) priority];
 						var objUpdateDelta = (updateStart - obj.LastUpdateTime).ToMilliSecondsInt();
 
 						if (objUpdateDelta >= minObjUpdateDelta)
@@ -1345,7 +1383,7 @@ namespace WCell.RealmServer.Global
 						// Fail-safe:
 						if (obj is Unit)
 						{
-							var unit = (Unit)obj;
+							var unit = (Unit) obj;
 							if (unit.Brain != null)
 							{
 								unit.Brain.IsRunning = false;
@@ -1353,7 +1391,7 @@ namespace WCell.RealmServer.Global
 						}
 						if (obj is Character)
 						{
-							((Character)obj).Client.Disconnect();
+							((Character) obj).Client.Disconnect();
 						}
 						else
 						{
@@ -1362,12 +1400,12 @@ namespace WCell.RealmServer.Global
 					}
 				}
 
-				if (m_tickCount % CharacterUpdateEnvironmentTicks == 0)
+				if (m_tickCount%CharacterUpdateEnvironmentTicks == 0)
 				{
 					UpdateCharacters();
 				}
 
-				UpdateMap();	// map specific stuff
+				UpdateMap(); // map specific stuff
 
 				// we updated the map, so set our last update time to now
 				m_lastUpdateTime = updateStart;
@@ -1379,7 +1417,7 @@ namespace WCell.RealmServer.Global
 				var newUpdateDelta = updateEnd - updateStart;
 
 				// weigh old update-time 9 times and new update-time once
-				_avgUpdateTime = ((_avgUpdateTime * 9) + (float)(newUpdateDelta).TotalMilliseconds) / 10;
+				_avgUpdateTime = ((_avgUpdateTime*9) + (float) (newUpdateDelta).TotalMilliseconds)/10;
 
 				// make sure to unset the ID *before* enqueuing the task in the ThreadPool again
 				Interlocked.Exchange(ref m_currentThreadId, 0);

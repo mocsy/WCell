@@ -1,1 +1,2 @@
-- added DefaultNPCDamageFactor and DefaultNPCHealthFactor to customize a server to give it more of a "diablo-feel" (many weak enemies instead of a few tough ones)
+- fixed shooting ranged weapons / heuristics for SpellCast.IsAICast
+- saved temporary enchantment duration correctly (still need to add the timer)

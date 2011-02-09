@@ -33,7 +33,7 @@ namespace WCell.RealmServer.Handlers
 		/// <summary>
 		/// "You created: "
 		/// </summary>
-		YouCreated = 1l << 32
+		YouCreated = 1L << 32
 	}
 
 	public static class ItemHandler
@@ -599,7 +599,7 @@ namespace WCell.RealmServer.Handlers
 				packet.Write((uint)item.ZoneId);
 				packet.Write((uint)item.MapId);
 				packet.Write((uint)item.BagFamily);
-				packet.Write((uint)item.TotemCategory);
+				packet.Write((uint)item.ToolCategory);
 
 				for (var i = 0; i < ItemConstants.MaxSocketCount; i++)
 				{

@@ -251,7 +251,7 @@ namespace WCell.RealmServer.Spells
 				if (record.SpellId == spell.SpellId)
 				{
 					// delete and remove
-					RealmServer.Instance.AddMessage(new Message(record.Delete));
+					RealmServer.IOQueue.AddMessage(new Message(record.Delete));
 					spells.RemoveAt(i);
 					return;
 				}
@@ -372,9 +372,9 @@ namespace WCell.RealmServer.Spells
 					chr.Inventory.Ensure(tool.Template, 1);
 				}
 			}
-			if (spell.RequiredTotemCategories != null)
+			if (spell.RequiredToolCategories != null)
 			{
-				foreach (var cat in spell.RequiredTotemCategories)
+				foreach (var cat in spell.RequiredToolCategories)
 				{
 					var tool = ItemMgr.GetFirstTotemCat(cat);
 					if (tool != null)
@@ -464,7 +464,7 @@ namespace WCell.RealmServer.Spells
 			{
 				var removedId = idCooldown as PersistentSpellIdCooldown;
 				var removedCat = catCooldown as PersistentSpellCategoryCooldown;
-				RealmServer.Instance.AddMessage(new Message(() =>
+				RealmServer.IOQueue.AddMessage(new Message(() =>
 				{
 					if (removedId != null)
 					{
@@ -493,14 +493,14 @@ namespace WCell.RealmServer.Spells
 				cd = spell.GetCooldown(Owner);
 			}
 
-			var catCd = 0;
+			int catCd;
 			if (itemSpell)
 			{
 				catCd = casterItem.Template.UseSpell.CategoryCooldown;
 			}
-			if (catCd == 0)
+			else
 			{
-				catCd = spell.CategoryCooldownTime;
+				catCd = spell.GetModifiedCooldown(Owner, spell.CategoryCooldownTime);
 			}
 
 			if (cd > 0)
@@ -569,7 +569,7 @@ namespace WCell.RealmServer.Spells
 			m_idCooldowns.Clear();
 			m_categoryCooldowns.Clear();
 
-			RealmServer.Instance.AddMessage(new Message(() =>
+			RealmServer.IOQueue.AddMessage(new Message(() =>
 			{
 				foreach (var cooldown in cds)
 				{
@@ -621,7 +621,7 @@ namespace WCell.RealmServer.Spells
 			// enqueue task
 			if (idCooldown is ActiveRecordBase || catCooldown is ActiveRecordBase)
 			{
-				RealmServer.Instance.AddMessage(new Message(() =>
+				RealmServer.IOQueue.AddMessage(new Message(() =>
 				{
 					if (idCooldown is ActiveRecordBase)
 					{

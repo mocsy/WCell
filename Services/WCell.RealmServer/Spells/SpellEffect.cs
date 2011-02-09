@@ -176,6 +176,13 @@ namespace WCell.RealmServer.Spells
 				Amplitude = ModManaRegenHandler.DefaultAmplitude;
 			}
 
+			if (HasTarget(ImplicitSpellTargetType.AllFriendlyInAura))
+			{
+				// whenever it's used, its used together with AllEnemiesAroundCaster in a beneficial spell)
+				ImplicitTargetA = ImplicitSpellTargetType.AllFriendlyInAura;
+				ImplicitTargetB = ImplicitSpellTargetType.None;
+			}
+
 			HasTargets = !NoTargetTypes.Contains(ImplicitTargetA) || !NoTargetTypes.Contains(ImplicitTargetB);
 
 			HasSingleTarget = HasTargets && !IsAreaEffect;
@@ -287,11 +294,11 @@ namespace WCell.RealmServer.Spells
 		/// <summary>
 		/// Whether this effect can share targets with the given effect
 		/// </summary>
-		public bool SharesTargets(SpellEffect b, bool aiCast)
+		public bool SharesTargetsWith(SpellEffect b, bool aiCast)
 		{
 			// if a TargetDefinition is set, it overrides the default implicit targets
 			var targetDef = GetTargetDefinition(aiCast);
-			return (targetDef != null && targetDef == b.GetTargetDefinition(aiCast)) ||
+			return (targetDef != null && targetDef.Equals(b.GetTargetDefinition(aiCast))) ||
 				(ImplicitTargetA == b.ImplicitTargetA && ImplicitTargetB == b.ImplicitTargetB);
 		}
 
@@ -436,7 +443,7 @@ namespace WCell.RealmServer.Spells
 			{
 				if (SpellPowerValuePct != 0)
 				{
-					value += (SpellPowerValuePct * ((Character)caster).GetDamageDoneMod(Spell.Schools[0]) + 50) / 100;
+					value += (SpellPowerValuePct * caster.GetDamageDoneMod(Spell.Schools[0]) + 50) / 100;
 				}
 			}
 			if (EffectIndex <= 2)
