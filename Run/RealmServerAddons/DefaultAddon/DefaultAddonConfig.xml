@@ -11,12 +11,14 @@
               </ArathiBase>
               <ArathiBasin>
                 <ABHonorScoreTicks>330</ABHonorScoreTicks>
+                <ABHonorScoreTicksInCallToArms>200</ABHonorScoreTicksInCallToArms>
                 <ABMaxScore>1600</ABMaxScore>
                 <ABNearVictoryScore>1400</ABNearVictoryScore>
                 <ABPowerUpRespawnTime>90000</ABPowerUpRespawnTime>
                 <ABPrepTimeMillis>60000</ABPrepTimeMillis>
                 <ABReputationScore>10</ABReputationScore>
                 <ABReputationScoreTicks>200</ABReputationScoreTicks>
+                <ABReputationScoreTicksInCallToArms>150</ABReputationScoreTicksInCallToArms>
                 <ABUpdateDelay>1000</ABUpdateDelay>
               </ArathiBasin>
             </ArathiBasin>
@@ -37,6 +39,21 @@
               </WarsongGulch>
             </WarsongGulch>
           </Battlegrounds>
+          <Events>
+            <DarkmoonFaireBlastenheimer>
+              <CannonPrepId>CannonPrep_3</CannonPrepId>
+              <ElwynnTeleOrientation>4.90124</ElwynnTeleOrientation>
+              <MagicWingsId>MagicWings_2</MagicWingsId>
+              <MulgoreTeleOrientation>3.48324</MulgoreTeleOrientation>
+              <TerokkarTeleOrientation>-1.71042</TerokkarTeleOrientation>
+            </DarkmoonFaireBlastenheimer>
+            <DarkmoonFaireSteamTonks>
+              <SteamTonkNPCId>DarkmoonSteamTonk</SteamTonkNPCId>
+              <SummonTonkSpellId>SummonRCTonk</SummonTonkSpellId>
+              <TonkControlConsoleGOEntryId>TonkControlConsole</TonkControlConsoleGOEntryId>
+              <UseTonkSpellId>UsingSteamTonkController</UseTonkSpellId>
+            </DarkmoonFaireSteamTonks>
+          </Events>
           <Samples>
             <AmbusherQuestSample>
               <MaxForgivenessDistance>100</MaxForgivenessDistance>
