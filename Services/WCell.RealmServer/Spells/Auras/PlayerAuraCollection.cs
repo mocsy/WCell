@@ -253,41 +253,58 @@ namespace WCell.RealmServer.Spells.Auras
 			var spell = cast.Spell;
 			if (ModifierWithChargesCount > 0)
 			{
-				var toRemove = new List<Aura>(3);
-				for (var i = 0; i < SpellModifiersFlat.Count; i++)
+				List<IAura> toRemove = null;
+				foreach (var modifier in SpellModifiersFlat)
 				{
-					var modifier = SpellModifiersFlat[i];
-					if (modifier.SpellEffect.MatchesSpell(spell))
+					var effect = modifier.SpellEffect;
+					if (effect.MatchesSpell(spell) && 
+						cast.Spell != effect.Spell &&
+						(cast.TriggerEffect == null || cast.TriggerEffect.Spell != effect.Spell))
 					{
 						if (modifier.Charges > 0)
 						{
 							modifier.Charges--;
 							if (modifier.Charges < 1)
 							{
+								if (toRemove == null)
+								{
+									toRemove = SpellCast.AuraListPool.Obtain();
+								}
 								toRemove.Add(modifier.Aura);
 							}
 						}
 					}
 				}
-				for (var i = 0; i < SpellModifiersPct.Count; i++)
+				foreach (var modifier in SpellModifiersPct)
 				{
-					var modifier = SpellModifiersPct[i];
-					if (modifier.SpellEffect.MatchesSpell(spell))
+					var effect = modifier.SpellEffect;
+					if (effect.MatchesSpell(spell) &&
+						cast.Spell != effect.Spell &&
+						(cast.TriggerEffect == null || cast.TriggerEffect.Spell != effect.Spell))
 					{
 						if (modifier.Charges > 0)
 						{
 							modifier.Charges--;
 							if (modifier.Charges < 1)
 							{
+								if (toRemove == null)
+								{
+									toRemove = SpellCast.AuraListPool.Obtain();
+								}
 								toRemove.Add(modifier.Aura);
 							}
 						}
 					}
 				}
 
-				foreach (var aura in toRemove)
+				if (toRemove != null)
 				{
-					aura.Remove(false);
+					foreach (var aura in toRemove)
+					{
+						aura.Remove(false);
+					}
+					toRemove.Clear();
+					SpellCast.AuraListPool.Recycle(toRemove);
 				}
 			}
 		}
@@ -440,18 +457,19 @@ namespace WCell.RealmServer.Spells.Auras
 		/// </summary>
 		private bool MayActivate(Aura aura, bool inclItemCheck)
 		{
-			// ShapeShiftMask & Items & AuraState
-			if (!aura.Spell.RequiredShapeshiftMask.HasAnyFlag(m_owner.ShapeshiftMask))
-			{
-				return false;
-			}
 			if (inclItemCheck && aura.Spell.CheckItemRestrictions(((Character)m_owner).Inventory) != SpellFailedReason.Ok)
 			{
 				return false;
 			}
-			if (m_owner.AuraState.HasAnyFlag(aura.Spell.RequiredCasterAuraState))
+
+			// ShapeShiftMask & Items & AuraState
+			if (aura.Spell.RequiredShapeshiftMask != 0 && !aura.Spell.RequiredShapeshiftMask.HasAnyFlag(m_owner.ShapeshiftMask))
 			{
-				return true;
+				return false;
+			}
+			if (aura.Spell.RequiredCasterAuraState != 0 && !m_owner.AuraState.HasAnyFlag(aura.Spell.RequiredCasterAuraState))
+			{
+				return false;
 			}
 			return true;
 		}

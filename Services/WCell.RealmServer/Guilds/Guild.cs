@@ -212,6 +212,8 @@ namespace WCell.RealmServer.Guilds
 			Register();
 
 			m_leader = AddMember(leader);
+            //Set the leader as guild master rank
+		    m_leader.RankId = 0;
 		    
 			RealmServer.IOQueue.AddMessage(Create);
 		}
@@ -359,13 +361,8 @@ namespace WCell.RealmServer.Guilds
 
 			if (update && member == m_leader)
 			{
-				OnLeaderDeleted();
-			}
-
-			if (m_leader == null)
-			{
-				// Guild has been disbanded
-				return true;
+                Disband();
+                return true;
 			}
 
 			m_syncRoot.Enter();
@@ -421,6 +418,7 @@ namespace WCell.RealmServer.Guilds
 		private void OnLeaderDeleted()
 		{
 			// leader was deleted
+            /*
 			var highestRank = int.MaxValue;
 			GuildMember highestMember = null;
 			foreach (var member in Members.Values)
@@ -436,10 +434,7 @@ namespace WCell.RealmServer.Guilds
 			{
 				Disband();
 			}
-			else
-			{
-				ChangeLeader(highestMember);
-			}
+             */
 		}
 		#endregion
 

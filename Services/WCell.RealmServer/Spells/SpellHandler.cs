@@ -325,7 +325,7 @@ namespace WCell.RealmServer.Spells
 				SpellEffect.InitMiscValueTypes();
 				loaded = true;
 				Spell.InitDbcs();
-				new DBCReader<Spell.SpellDBCConverter>(RealmServerConfiguration.GetDBCFile(WCellDef.DBC_SPELL));
+				new DBCReader<Spell.SpellDBCConverter>(RealmServerConfiguration.GetDBCFile(WCellConstants.DBC_SPELL));
 
 				ContentMgr.Load<SpellLearnRelation>();
 				InitSummonHandlers();
@@ -523,6 +523,7 @@ namespace WCell.RealmServer.Spells
 			SpellEffectCreators[(int)SpellEffectType.DestroyAllTotems] = (cast, effect) => new DestroyAllTotemsHandler(cast, effect);
 			SpellEffectCreators[(int)SpellEffectType.CreateManaGem] = (cast, effect) => new CreateManaGemEffectHandler(cast, effect);
 			SpellEffectCreators[(int)SpellEffectType.Sanctuary] = (cast, effect) => new RemoveImpairingEffectsHandler(cast, effect);
+            SpellEffectCreators[(int)SpellEffectType.Inebriate] = (cast, effect) => new Inebriate(cast, effect);
 
 			for (var i = 0; i < SpellEffectCreators.Length; i++)
 			{

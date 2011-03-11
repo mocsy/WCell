@@ -283,13 +283,8 @@ namespace WCell.RealmServer.Entities
 					throw new NullReferenceException(string.Format("Faction cannot be set to null (Unit: {0}, Map: {1})", this, m_Map));
 				}
 
-				var affinityChanged = m_faction != null;
 				m_faction = value;
 				SetUInt32(UnitFields.FACTIONTEMPLATE, value.Template.Id);
-				if (affinityChanged)
-				{
-					OnAffinityChanged();
-				}
 			}
 		}
 
@@ -1564,7 +1559,7 @@ namespace WCell.RealmServer.Entities
 		}
 
 
-		private float internalPower;
+		protected float internalPower;
 		internal void UpdatePower(int delayMillis)
 		{
 			internalPower += (m_PowerRegenPerTick * delayMillis) / (float)RegenerationFormulas.RegenTickDelayMillis;	// rounding

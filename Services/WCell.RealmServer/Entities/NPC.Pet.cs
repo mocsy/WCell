@@ -288,11 +288,12 @@ namespace WCell.RealmServer.Entities
 				// make sure to execute in context
 				AddMessage(() =>
 				{
+					// add/remove spell ranks
+					UpdateSpellRanks();
+
 					// scale size, if necessary
 					UpdateSize();
 
-					// add/remove spell ranks
-					UpdateSpellRanks();
 					var level = Level;
 
 					// update talents
@@ -325,9 +326,9 @@ namespace WCell.RealmServer.Entities
 						ModPetStatsPerLevel(levelStatInfo);
 						m_auras.ReapplyAllAuras();
 					}
-					m_entry.NotifyLeveledChanged(this);
 				});
 			}
+			m_entry.NotifyLeveledChanged(this);
 		}
 
 		internal void ModPetStatsPerLevel(PetLevelStatInfo levelStatInfo)
@@ -465,7 +466,7 @@ namespace WCell.RealmServer.Entities
 		#endregion
 
 		#region Actions
-		public uint[] BuidPetActionBar()
+		public uint[] BuildPetActionBar()
 		{
 			var bar = new uint[PetConstants.PetActionCount];
 
@@ -489,26 +490,40 @@ namespace WCell.RealmServer.Entities
 				Type = PetActionType.SetAction
 			}.Raw;
 
-			var spells = m_spells.GetEnumerator();
-			for (byte j = 0; j < PetConstants.PetSpellCount; j++)
-			{
-				if (!spells.MoveNext())
-				{
-					bar[i++] = new PetActionEntry
-					{
-						Type = PetActionType.CastSpell2 + j
-					}.Raw;
-				}
-				else
-				{
-					var spell = spells.Current;
-					var actionEntry = new PetActionEntry();
-					actionEntry.SetSpell(spell.SpellId, PetActionType.DefaultSpellSetting);
-					bar[i++] = actionEntry.Raw;
-				}
-			}
+            if (Entry.Spells != null)
+            {
+                var spells = Entry.Spells.GetEnumerator();
 
-			bar[i++] = new PetActionEntry
+                for (byte j = 0; j < PetConstants.PetSpellCount; j++)
+                {
+                    if (!spells.MoveNext())
+                    {
+                        bar[i++] = new PetActionEntry
+                                       {
+                                           Type = PetActionType.CastSpell2 + j
+                                       }.Raw;
+                    }
+                    else
+                    {
+                        var spell = spells.Current;
+                        var actionEntry = new PetActionEntry();
+                        actionEntry.SetSpell(spell.Key, PetActionType.DefaultSpellSetting);
+                        bar[i++] = actionEntry.Raw;
+                    }
+                }
+            }
+		    else
+            {
+                for (byte j = 0; j < PetConstants.PetSpellCount; j++)
+                {
+                    bar[i++] = new PetActionEntry
+                                   {
+                                       Type = PetActionType.CastSpell2 + j
+                                   }.Raw;
+                }
+            }
+
+		    bar[i++] = new PetActionEntry
 			{
 				AttackMode = PetAttackMode.Aggressive,
 				Type = PetActionType.SetMode

@@ -614,6 +614,7 @@ namespace WCell.RealmServer.Spells
 				{
 					auras.Clear();
 					AuraListPool.Recycle(auras);
+					auras = null;
 				}
 			}
 
@@ -653,12 +654,6 @@ namespace WCell.RealmServer.Spells
 			TargetCount = m_targets.Count;
 
 			var caster = CasterUnit;
-
-			// consume combopoints
-			if (m_spell.IsFinishingMove)
-			{
-				caster.ModComboState(null, 0);
-			}
 
 			if (caster.IsAlive)
 			{
@@ -844,6 +839,12 @@ namespace WCell.RealmServer.Spells
 			if (!m_casting)
 			{
 				return; // should not happen (but might)
+			}
+
+			// consume combopoints
+			if (m_spell.IsFinishingMove)
+			{
+				caster.ModComboState(null, 0);
 			}
 
 			// consumes spell modifiers (if required)

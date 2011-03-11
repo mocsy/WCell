@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NLog;
 using WCell.Constants;
+using WCell.Constants.NPCs;
 using WCell.Constants.Pets;
 using WCell.Constants.Spells;
 using WCell.Constants.Talents;
@@ -293,17 +294,27 @@ namespace WCell.RealmServer.Handlers
 		{
 			// TODO: Cooldowns
 			var record = pet.PetRecord;
-			using (var packet = new RealmPacketOut(RealmServerOpCode.SMSG_PET_SPELLS, 20 + (PetConstants.PetActionCount * 4) + 1 + (pet.Spells.Count) + 1 + (0)))
+            var mode = pet.Entry.Type == CreatureType.NonCombatPet ? PetAttackMode.Passive : PetAttackMode.Defensive;
+		    var flags = PetFlags.None;
+		    uint[] actions = null;
+            if(record != null)
+            {
+                mode = record.AttackMode;
+                flags = record.Flags;
+                actions = record.ActionButtons;
+            }
+            if (actions == null)
+                actions = pet.BuildPetActionBar();
+
+		    using (var packet = new RealmPacketOut(RealmServerOpCode.SMSG_PET_SPELLS, 20 + (PetConstants.PetActionCount * 4) + 1 + (pet.Spells.Count) + 1 + (0)))
 			{
 				packet.Write(pet.EntityId);
 				packet.Write((ushort)pet.Entry.FamilyId);
-				//packet.Write((ushort)0);
 				packet.Write(pet.RemainingDecayDelayMillis);			// duration
-				packet.Write((byte)record.AttackMode);
+				packet.Write((byte)mode);
 				packet.Write((byte)currentAction);
-				packet.Write((ushort)record.Flags);
+				packet.Write((ushort)flags);
 
-				var actions = record.ActionButtons;
 				for (var i = 0; i < PetConstants.PetActionCount; i++)
 				{
 					var action = actions[i];
@@ -317,7 +328,8 @@ namespace WCell.RealmServer.Handlers
 				{
 					if (!spell.IsPassive)
 					{
-						packet.Write(spell.Id | ((uint)PetSpellState.Enabled << 24));
+						packet.Write((ushort)spell.Id);
+                        packet.Write((ushort)PetSpellState.Enabled);
 						++spellCount;
 					}
 				}
@@ -330,6 +342,43 @@ namespace WCell.RealmServer.Handlers
 				owner.Send(packet);
 			}
 		}
+
+        public static void SendPlayerPossessedPetSpells(Character owner, Character possessed)
+        {
+
+            using (var packet = new RealmPacketOut(RealmServerOpCode.SMSG_PET_SPELLS, 20 + (PetConstants.PetActionCount * 4) + 1 + (0) + 1 + (0)))
+            {
+                packet.Write(possessed.EntityId);
+                packet.Write((ushort) CreatureFamilyId.None);
+                packet.Write(0); // duration
+                packet.Write((byte) PetAttackMode.Passive);
+                packet.Write((byte) PetAction.Stay);
+                packet.Write((ushort) PetFlags.None);
+
+                var action = new PetActionEntry
+                                 {
+                                     Action = PetAction.Attack,
+                                     Type = PetActionType.SetAction
+                                 }.Raw;
+
+                packet.Write(action);
+
+                for (var i = 1; i < PetConstants.PetActionCount; i++)
+                {
+                    action = new PetActionEntry
+                                 {
+                                     Type = PetActionType.SetAction
+                                 }.Raw;
+                    packet.Write(action);
+                }
+
+                packet.Write((byte) 0); // No Spells
+
+                packet.Write((byte) 0); // No Cooldowns
+
+                owner.Send(packet);
+            }
+        }
 
 		public static void SendEmptySpells(IPacketReceiver receiver)
 		{

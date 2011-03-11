@@ -160,19 +160,28 @@ namespace WCell.RealmServer.Global
 			{
 				if (isBg || Template.IsHostileTo(chr))
 				{
-					chr.PvPState = PvPState.PVP;
+				    chr.UpdatePvPState(true, true);
 					chr.PlayerFlags |= PlayerFlags.PVP;
+                    chr.PlayerFlags &= ~(PlayerFlags.InPvPSanctuary | PlayerFlags.FreeForAllPVP);
 				}
 				else if (Template.IsSanctuary)
 				{
 					chr.PvPState = PvPState.InPvPSanctuary;
 					chr.PlayerFlags |= PlayerFlags.InPvPSanctuary;
+                    chr.PlayerFlags &= ~(PlayerFlags.PVP | PlayerFlags.FreeForAllPVP);
 				}
 				else
 				{
-					chr.PvPState = PvPState.None;
-					chr.PlayerFlags &= ~(PlayerFlags.PVP | PlayerFlags.InPvPSanctuary);
+                    chr.UpdatePvPState(false);
+                    chr.PlayerFlags &= ~(PlayerFlags.PVP | PlayerFlags.InPvPSanctuary | PlayerFlags.FreeForAllPVP);
 				}
+
+                if (Template.IsArena)
+                {
+                    chr.PvPState = PvPState.FFAPVP;
+                    chr.PlayerFlags |= PlayerFlags.FreeForAllPVP;
+                    chr.PlayerFlags &= ~(PlayerFlags.InPvPSanctuary);
+                }
 			}
 
 			Template.OnPlayerEntered(chr, oldZone);

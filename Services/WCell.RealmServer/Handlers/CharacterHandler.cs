@@ -427,7 +427,7 @@ namespace WCell.RealmServer.Handlers
 									   "Could not create Char-Enum " +
 									   "for Character \"{0}\" (Race: {1}, Class: {2}, Level: {3}, Map: {4}{5}).",
 									   curRecord, curRecord.Race, curRecord.Class, curRecord.Level, curRecord.MapId,
-									   curRecord.New ? ", [New]" : "");
+									   curRecord.IsNew ? ", [New]" : "");
 			}
 		}
 		#endregion
@@ -1343,7 +1343,7 @@ namespace WCell.RealmServer.Handlers
 		public static void HandleSetActiveMover(IRealmClient client, RealmPacketIn packet)
 		{
 			// TODO: Verify
-			//client.ActiveMover = client.ActiveCharacter.Map.GetObject(packet.ReadEntityId());
+			client.ActiveCharacter.MoveControl.Mover = client.ActiveCharacter.Map.GetObject(packet.ReadEntityId());
 
 			SendTickQuery(client);
 		}
@@ -1419,7 +1419,7 @@ namespace WCell.RealmServer.Handlers
 		{
 			using (var packet = new RealmPacketOut(RealmServerOpCode.SMSG_CLIENT_CONTROL_UPDATE, 9))
 			{
-				packet.Write(target.EntityId);
+				target.EntityId.WritePacked(packet);
 				packet.Write(canControl);
 				rcvr.Send(packet);
 			}
