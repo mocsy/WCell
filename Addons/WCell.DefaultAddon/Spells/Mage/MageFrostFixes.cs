@@ -68,6 +68,18 @@ namespace WCell.Addons.Default.Spells.Mage
 				chillEffect.ImplicitTargetB = dmgEffect.ImplicitTargetB;
 				chillEffect.SpellEffectHandlerCreator = (cast, effect) => new ImprovedBlizzardHandler(cast, effect);
 			});
+
+			//IceLance deals tripple dmg to frozen targets
+			SpellLineId.MageIceLance.Apply(spell =>
+			{
+				spell.Effects[0].SpellEffectHandlerCreator = (cast, effect) => new IceLanceHandler(cast, effect);
+			});
+
+			// Summon Water Elemental is missing a spell trigger
+			SpellLineId.MageFrostSummonWaterElemental.Apply(spell =>
+			{
+				spell.AddTriggerSpellEffect(SpellId.SummonWaterElemental_6);
+			});
 		}
 
 		#region ColdSnap
@@ -108,8 +120,8 @@ namespace WCell.Addons.Default.Spells.Mage
 				var chr = m_cast.CasterUnit as Character;
 				if (chr != null)
 				{
-					var charSpells = chr.PlayerSpells;
-					if (charSpells.Contains(SpellId.GlyphOfEternalWater))
+					var glyphaura = chr.Auras[SpellId.GlyphOfEternalWater];
+					if (glyphaura != null)
 						chr.SpellCast.Trigger(SpellId.SummonWaterElemental_7, chr);
 					else
 						chr.SpellCast.Trigger(SpellId.SummonWaterElemental_6, chr);
@@ -123,7 +135,7 @@ namespace WCell.Addons.Default.Spells.Mage
 		{
 			public override void OnAttack(DamageAction action)
 			{
-				if (action.SpellEffect != null && action.Victim.AuraState == AuraStateMask.Frozen)
+				if (action.SpellEffect != null && action.Victim.AuraState.HasAnyFlag(AuraStateMask.Frozen))
 				{
 					switch (m_aura.Spell.SpellId)
 					{
@@ -166,6 +178,37 @@ namespace WCell.Addons.Default.Spells.Mage
 							m_cast.Trigger(chilledSpell, Effect, target);
 						}
 					}
+				}
+			}
+		}
+		#endregion
+
+		#region IceLanceHandler
+		public class IceLanceHandler : SpellEffectHandler
+		{
+			public IceLanceHandler(SpellCast cast, SpellEffect effect)
+				: base(cast, effect)
+			{
+			}
+
+			protected override void Apply(WorldObject target)
+			{
+				var unit = target as Unit;
+				var chr = m_cast.CasterChar;
+				if (unit != null)
+				{
+					if(unit.AuraState.HasAnyFlag(AuraStateMask.Frozen))
+					{
+						//Glyph of Ice Lance: Your Ice Lance now causes 4 times damage against frozen targets higher level than you instead of triple damage.
+						if (chr.Auras[SpellId.GlyphOfIceLance] != null && unit.Level > chr.Level)
+						{
+							unit.DealSpellDamage(m_cast.CasterUnit, Effect, CalcEffectValue() * 4);
+						}
+						else
+							unit.DealSpellDamage(m_cast.CasterUnit, Effect, CalcEffectValue() * 3);
+					}
+					else
+						unit.DealSpellDamage(m_cast.CasterUnit, Effect, CalcEffectValue());
 				}
 			}
 		}

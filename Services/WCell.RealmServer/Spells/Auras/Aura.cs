@@ -4,7 +4,7 @@
  *   copyright		: (C) The WCell Team
  *   email		: info@wcell.org
  *   last changed	: $LastChangedDate: 2010-02-03 04:37:17 +0100 (on, 03 feb 2010) $
- *   last author	: $LastChangedBy: dominikseifert $
+ 
  *   revision		: $Rev: 1243 $
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -434,7 +434,13 @@ namespace WCell.RealmServer.Spells.Auras
 
 					m_ticks = 0;
 
-					m_timer.Start(time);
+					//stop timer if we set a negative duration
+					if (value < 0)
+					{
+						m_timer.Stop();
+					}
+					else
+						m_timer.Start(time);
 				}
 			}
 		}
@@ -502,7 +508,7 @@ namespace WCell.RealmServer.Spells.Auras
 		public int Duration
 		{
 			get { return m_controller == null ? m_duration : m_controller.Duration; }
-			set { m_duration = value; TimeLeft = value; m_auraFlags |= AuraFlags.HasDuration; SetupTimer(); Start(); }
+			set { m_duration = value; m_auraFlags |= AuraFlags.HasDuration; SetupTimer(); TimeLeft = m_duration; }
 		}
 
 		public int Until
@@ -1292,7 +1298,7 @@ namespace WCell.RealmServer.Spells.Auras
 		public override string ToString()
 		{
 			return "Aura " + m_spell + ": " + (IsBeneficial ? "Beneficial" : "Harmful") +
-				" [TimeLeft: " + TimeSpan.FromMilliseconds(TimeLeft) + "]" +
+				(HasTimeout ? " [TimeLeft: " + TimeSpan.FromMilliseconds(TimeLeft) + "]" : "") +
 				(m_controller != null ? (" Controlled by: " + m_controller) : "");
 		}
 

@@ -4,7 +4,7 @@
  *   copyright		: (C) The WCell Team
  *   email		    : info@wcell.org
  *   last changed	: $LastChangedDate: 2010-02-25 12:57:15 +0100 (to, 25 feb 2010) $
- *   last author	: $LastChangedBy: dominikseifert $
+ 
  *   revision		: $Rev: 1260 $
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -24,6 +24,7 @@ using WCell.Constants.Pets;
 using WCell.Constants.Spells;
 using WCell.Constants.World;
 using WCell.Util.Graphics;
+using WCell.Util.ObjectPools;
 using WCell.Util.Threading;
 using WCell.Core.Timers;
 using WCell.RealmServer.Entities;
@@ -31,6 +32,7 @@ using WCell.RealmServer.Handlers;
 using WCell.RealmServer.Items;
 using WCell.RealmServer.Network;
 using WCell.RealmServer.Spells.Auras;
+using WCell.RealmServer.Talents;
 using WCell.Util;
 using WCell.Util.NLog;
 using WCell.RealmServer.Global;
@@ -94,6 +96,7 @@ namespace WCell.RealmServer.Spells
 		Spell m_spell;
 		private int m_castDelay;
 		private int m_startTime;
+		public uint m_glyphSlot;
 
 		public ObjectReference CasterReference
 		{
@@ -610,7 +613,7 @@ namespace WCell.RealmServer.Spells
 		/// This starts a spell-cast, requested by the client.
 		/// The client submits where or what the user selected in the packet.
 		/// </summary>
-		internal SpellFailedReason Start(Spell spell, RealmPacketIn packet, byte castId, byte unkFlags)
+		internal SpellFailedReason Start(Spell spell, RealmPacketIn packet, byte castId, byte unkFlags, uint glyphSlot = (uint)0)
 		{
 			isPlayerCast = true;
 
@@ -628,6 +631,8 @@ namespace WCell.RealmServer.Spells
 					Cancel(SpellFailedReason.DontReport);
 				}
 			}
+
+			m_glyphSlot = glyphSlot;
 
 			Map = CasterObject.Map;
 			Phase = CasterObject.Phase;
@@ -1326,7 +1331,7 @@ namespace WCell.RealmServer.Spells
 						return CastMissReason.Immune_2;
 					}
 
-					if (spell.Schools.All(target.IsImmune))
+					if (!spell.AttributesEx.HasAnyFlag(SpellAttributesEx.UnaffectedBySchoolImmunity) && spell.Schools.All(target.IsImmune))
 					{
 						return CastMissReason.Immune;
 					}

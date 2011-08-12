@@ -4,7 +4,7 @@
  *   copyright		: (C) The WCell Team
  *   email		: info@wcell.org
  *   last changed	: $LastChangedDate: 2010-01-14 20:02:32 +0100 (to, 14 jan 2010) $
- *   last author	: $LastChangedBy: dominikseifert $
+
  *   revision		: $Rev: 1194 $
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -34,7 +34,7 @@ namespace WCell.RealmServer.Spells.Auras.Handlers
 			if (m_aura.Spell.SchoolMask == Constants.DamageSchoolMask.Frost)
 				m_aura.Auras.Owner.DecMechanicCount(SpellMechanic.Frozen);
 
-			m_aura.Auras.Owner.IncMechanicCount(SpellMechanic.Stunned);
+			m_aura.Auras.Owner.DecMechanicCount(SpellMechanic.Stunned);
 		}
 
 		public override bool IsPositive

@@ -4,7 +4,7 @@
  *   copyright		: (C) The WCell Team
  *   email		: info@wcell.org
  *   last changed	: $LastChangedDate: 2008-08-14 03:51:23 +0800 (Thu, 14 Aug 2008) $
- *   last author	: $LastChangedBy: dominikseifert $
+ 
  *   revision		: $Rev: 591 $
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -69,6 +69,10 @@ namespace WCell.Core
 	    public const string DBC_REGENHPPERSPIRIT = "GtRegenHPPerSpt.dbc";
 
         public const string DBC_REGENMPPERSPIRIT = "GtRegenMPPerSpt.dbc";
+
+		public const string DBC_GLYPHSLOT = "GlyphSlot.dbc";
+
+		public const string DBC_GLYPHPROPERTIES = "GlyphProperties.dbc";
 
 		public const string DBC_BARBERSHOPSTYLE = "BarberShopStyle.dbc";
 
