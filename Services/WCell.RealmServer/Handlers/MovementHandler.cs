@@ -24,12 +24,11 @@ using WCell.Constants.World;
 using WCell.Core.Network;
 using WCell.Core.Paths;
 using WCell.RealmServer.Entities;
-using WCell.RealmServer.Network;
-using WCell.Core.Terrain.Paths;
-using WCell.Util;
-using WCell.RealmServer.Spells;
 using WCell.RealmServer.NPCs.Vehicles;
+using WCell.RealmServer.Network;
+using WCell.RealmServer.Spells;
 using WCell.RealmServer.Spells.Auras;
+using WCell.Util;
 using WCell.Util.Graphics;
 
 namespace WCell.RealmServer.Handlers
@@ -828,14 +827,13 @@ namespace WCell.RealmServer.Handlers
 
 		public static void SendNewWorld(IRealmClient client, MapId map, ref Vector3 pos, float orientation)
 		{
+            var chr = client.ActiveCharacter;
+            var trans = chr.Transport;
 			// opens loading screen
 			using (var packet = new RealmPacketOut(RealmServerOpCode.SMSG_TRANSFER_PENDING, 4))
 			{
 				packet.WriteUInt((uint)map);
-
-				var chr = client.ActiveCharacter;
-				var trans = chr.Transport;
-				if (trans != null)
+                if (trans != null)
 				{
 					packet.Write((uint)trans.Entry.Id);
 					packet.Write((uint)chr.MapId);
@@ -848,10 +846,18 @@ namespace WCell.RealmServer.Handlers
 			using (var outPacket = new RealmPacketOut(RealmServerOpCode.SMSG_NEW_WORLD, 20))
 			{
 				outPacket.WriteUInt((uint)map);
-				outPacket.Write(pos);
-				outPacket.WriteFloat(orientation);
+                if (trans != null)
+                {
+                    outPacket.Write(chr.TransportPosition);
+                    outPacket.Write(chr.TransportOrientation);
+                }
+                else
+                {
+                    outPacket.Write(pos);
+                    outPacket.WriteFloat(orientation);
+                }
 
-				client.Send(outPacket);
+			    client.Send(outPacket);
 			}
 
 			// client will ask for re-initialization afterwards

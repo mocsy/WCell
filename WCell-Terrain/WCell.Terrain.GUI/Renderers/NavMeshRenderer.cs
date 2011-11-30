@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework.Graphics;
 using WCell.Terrain.GUI.Util;
 using WCell.Terrain.Recast.NavMesh;
 using WCell.Util;
-using Vector3 = WCell.Util.Graphics.Vector3;
+using WVector3 = WCell.Util.Graphics.Vector3;
 
 namespace WCell.Terrain.GUI.Renderers
 {
@@ -15,8 +15,8 @@ namespace WCell.Terrain.GUI.Renderers
 	public class SolidNavMeshRenderer : NavMeshRenderer
 	{
 
-		public SolidNavMeshRenderer(Game game)
-			: base(game)
+		public SolidNavMeshRenderer(Game game, TerrainTile tile)
+			: base(game, tile)
 		{
 		}
 
@@ -36,8 +36,8 @@ namespace WCell.Terrain.GUI.Renderers
 	/// </summary>
 	public class WireframeNavMeshRenderer : NavMeshRenderer
 	{
-		public WireframeNavMeshRenderer(Game game)
-			: base(game)
+		public WireframeNavMeshRenderer(Game game, TerrainTile tile)
+			: base(game, tile)
 		{
 		}
 
@@ -54,20 +54,23 @@ namespace WCell.Terrain.GUI.Renderers
 
 	public abstract class NavMeshRenderer : RendererBase
 	{
+	    private TerrainTile tile;
 		private RasterizerState rasterState;
-		readonly BlendState alphaBlendState = new BlendState()
-		{
-			AlphaBlendFunction = BlendFunction.Add,
-			AlphaSourceBlend = Blend.SourceAlpha,
-			ColorSourceBlend = Blend.SourceAlpha,
-			AlphaDestinationBlend = Blend.InverseSourceAlpha,
-			ColorDestinationBlend = Blend.InverseSourceAlpha
-		};
+        //private readonly BlendState alphaBlendState = BlendState.Additive;
+        readonly BlendState alphaBlendState = new BlendState
+        {
+            AlphaBlendFunction = BlendFunction.Add,
+            AlphaSourceBlend = Blend.SourceAlpha,
+            ColorSourceBlend = Blend.SourceAlpha,
+            AlphaDestinationBlend = Blend.InverseSourceAlpha,
+            ColorDestinationBlend = Blend.InverseSourceAlpha
+        };
 
 
-		internal NavMeshRenderer(Game game)
+		internal NavMeshRenderer(Game game, TerrainTile tile)
 			: base(game)
 		{
+		    this.tile = tile;
 		}
 
 		protected abstract Color RenderColor { get; }
@@ -78,6 +81,7 @@ namespace WCell.Terrain.GUI.Renderers
 		{
 			rasterState = new RasterizerState()
 			{
+				CullMode = CullMode.None,
 				DepthBias = 1e-6f,
 				FillMode = RenderMode
 			};
@@ -87,46 +91,44 @@ namespace WCell.Terrain.GUI.Renderers
 
 		public override void Draw(GameTime gameTime)
 		{
-			var graphics = Game.GraphicsDevice;
+		    var oldDepthStencilState = GraphicsDevice.DepthStencilState;
+			var oldRasterState = GraphicsDevice.RasterizerState;
+			var oldBlendState = GraphicsDevice.BlendState;
 
-			var oldRasterState = graphics.RasterizerState;
-			var oldBlendState = graphics.BlendState;
-
-			graphics.RasterizerState = rasterState;
-			graphics.BlendState = alphaBlendState;
-
+            GraphicsDevice.RasterizerState = rasterState;
+			GraphicsDevice.BlendState = alphaBlendState;
+            
 			base.Draw(gameTime);
 
-			graphics.RasterizerState = oldRasterState;
-			graphics.BlendState = oldBlendState;
+		    GraphicsDevice.DepthStencilState = oldDepthStencilState;
+			GraphicsDevice.RasterizerState = oldRasterState;
+			GraphicsDevice.BlendState = oldBlendState;
 		}
 
 		protected override void BuildVerticiesAndIndicies()
 		{
-			var mesh = Viewer.Tile.NavMesh;
-			var vertices = mesh.Vertices;
+            List<int> indices;
+            using (LargeObjectPools.IndexListPool.Borrow(out indices))
+            {
+                var tempVertices = new List<VertexPositionNormalColored>();
+                
+                indices.Clear();
 
-			List<int> indices;
-			mesh.GetTriangles(out indices);
+                var mesh = tile.NavMesh;
+                mesh.GetTriangles(indices);
 
-			if (vertices.Length == 0 || indices.Count == 0) return;
+                if (mesh.Vertices.Length == 0 || indices.Count == 0) return;
 
-			_cachedVertices = new VertexPositionNormalColored[vertices.Length];
-			for (var i = 0; i < vertices.Length; i++)
-			{
-				var vertex = vertices[i];
-				_cachedVertices[i] = new VertexPositionNormalColored(vertex.ToXna(),
-																		RenderColor,
-																		Microsoft.Xna.Framework.Vector3.Zero);
-			}
+                foreach (var vertex in mesh.Vertices)
+                {
+                    tempVertices.Add(new VertexPositionNormalColored(vertex.ToXna(), RenderColor, Vector3.Zero));
+                }
 
-			_cachedIndices = new int[indices.Count];
-			for (int i = 0; i < indices.Count; i++)
-			{
-				_cachedIndices[i] = indices[i];
-			}
+                _cachedIndices = indices.ToArray();
+                _cachedVertices = tempVertices.ToArray();
+            }
 
-			_renderCached = true;
+		    _renderCached = true;
 		}
 	}
 }

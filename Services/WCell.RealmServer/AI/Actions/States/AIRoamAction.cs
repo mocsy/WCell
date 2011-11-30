@@ -10,9 +10,23 @@ namespace WCell.RealmServer.AI.Actions.States
 	/// <summary>
 	/// AI movemement action for roaming
 	/// </summary>
-	public class AIRoamAction : AIWaypointMoveAction, IAIStateAction
+	public class AIRoamAction : AIAction, IAIStateAction
 	{
-		public static int DefaultRoamSpellCastDelay = 60000;
+		public static int DefaultRoamSpellCastDelay = 30000;
+
+		private DateTime _lastSpellCast;
+
+		public AIRoamAction(Unit owner)
+			: base(owner)
+		{
+			MinimumRoamSpellCastDelay = DefaultRoamSpellCastDelay;
+		}
+
+		public AIRoamAction(Unit owner, AIAction roamAction) :
+			base(owner)
+		{
+			Strategy = roamAction;
+		}
 
 		public int MinimumRoamSpellCastDelay
 		{
@@ -20,48 +34,40 @@ namespace WCell.RealmServer.AI.Actions.States
 			set;
 		}
 
-		private DateTime lastSpellCast;
-
-		public AIRoamAction(Unit owner) :
-			base(owner, AIMovementType.ForwardThenBack, owner.Waypoints)
-		{
-			MinimumRoamSpellCastDelay = DefaultRoamSpellCastDelay;
-			var spawn = owner.SpawnPoint;
-			if (spawn != null)
-			{
-				var spawnEntry = spawn.SpawnEntry;
-
-				if (spawnEntry != null)
-				{
-					m_WPmovementType = spawnEntry.MoveType;
-				}
-			}
-		}
+		/// <summary>
+		/// The strategy to be used while roaming
+		/// </summary>
+		public AIAction Strategy { get; set; }
 
 		public override void Start()
 		{
 			// make sure we don't have Target nor Attacker
 			m_owner.FirstAttacker = null;
 			m_owner.Target = null;
-			base.Start();
+			Strategy.Start();
 		}
 
 		public override void Update()
 		{
 			if (!m_owner.Brain.CheckCombat())
 			{
-				if (UsesSpells && HasSpellReady && m_owner.CanCastSpells && lastSpellCast + TimeSpan.FromMilliseconds(MinimumRoamSpellCastDelay) < DateTime.Now)
+				if (UsesSpells && HasSpellReady && m_owner.CanCastSpells && _lastSpellCast + TimeSpan.FromMilliseconds(MinimumRoamSpellCastDelay) < DateTime.Now)
 				{
 					if (TryCastSpell())
 					{
-						lastSpellCast = DateTime.Now;
+						_lastSpellCast = DateTime.Now;
 						m_owner.Movement.Stop();
 						return;
 					}
 				}
 
-				base.Update();
+				Strategy.Update();
 			}
+		}
+
+		public override void Stop()
+		{
+			Strategy.Stop();
 		}
 
 		/// <summary>

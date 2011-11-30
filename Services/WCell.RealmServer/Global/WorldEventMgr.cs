@@ -1,20 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using NLog;
-using WCell.Constants.Quests;
 using WCell.Core.Initialization;
-using WCell.Core.Timers;
 using WCell.RealmServer.Content;
 using WCell.RealmServer.GameObjects;
 using WCell.RealmServer.NPCs;
-using WCell.RealmServer.NPCs.Spawns;
 using WCell.RealmServer.Quests;
 using WCell.RealmServer.Spells;
 using WCell.Util;
-using WCell.Util.Threading.TaskParallel;
+using WCell.Util.Variables;
 
 namespace WCell.RealmServer.Global
 {	
@@ -33,6 +28,7 @@ namespace WCell.RealmServer.Global
 
 	    private static DateTime LastUpdateTime;
 
+		[NotVariable]
         public static List<WorldEventQuest> WorldEventQuests = new List<WorldEventQuest>();
         #endregion
 
@@ -235,7 +231,7 @@ namespace WCell.RealmServer.Global
 
                 if (worldEventNPC.Spawn)
                 {
-                    map.AddNPCSpawnPoolLater(spawnEntry.PoolTemplate);
+                    map.AddNPCSpawnPool(spawnEntry.PoolTemplate);
                 }
                 else
                 {
@@ -290,7 +286,7 @@ namespace WCell.RealmServer.Global
 
                 if (worldEventNPC.Spawn)
                 {
-                    map.RemoveNPCSpawnPoolLater(spawnEntry.PoolTemplate);
+                    map.RemoveNPCSpawnPool(spawnEntry.PoolTemplate);
                 }
                 else
                 {
@@ -315,7 +311,7 @@ namespace WCell.RealmServer.Global
 
                 if (worldEventGO.Spawn)
                 {
-                    map.RemoveGOSpawnPoolLater(spawnEntry.PoolTemplate);
+                    map.RemoveGOSpawnPool(spawnEntry.PoolTemplate);
                 }
                 else
                 {

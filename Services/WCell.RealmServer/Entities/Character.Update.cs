@@ -16,15 +16,12 @@
 
 using System;
 using System.Collections.Generic;
-using WCell.Util.Collections;
-using WCell.Constants;
 using WCell.Constants.Items;
 using WCell.Constants.Updates;
 using WCell.Core;
-using WCell.Util.Threading;
 using WCell.RealmServer.Handlers;
 using WCell.RealmServer.UpdateFields;
-using WCell.Core.Network;
+using WCell.Util.Collections;
 
 namespace WCell.RealmServer.Entities
 {
@@ -197,7 +194,7 @@ namespace WCell.RealmServer.Entities
 			{
 				Observing.IterateEnvironment(BroadcastRange, (obj) =>
 				{
-					if (!IsInPhase(obj))
+					if (!Observing.IsInPhase(obj))
 					{
 						return true;
 					}
@@ -207,7 +204,7 @@ namespace WCell.RealmServer.Entities
 
 					//ensure "this" never goes out of range
 					//if we are observing another units broadcasts
-					if (!CanSee(obj) && !ReferenceEquals(obj, this))
+					if (!Observing.CanSee(obj) && !ReferenceEquals(obj, this))
 					{
 						return true;
 					}
@@ -390,15 +387,7 @@ namespace WCell.RealmServer.Entities
 			{
 				return UpdateFieldFlags.Private | UpdateFieldFlags.OwnerOnly | UpdateFieldFlags.GroupOnly | UpdateFieldFlags.Public;
 			}
-			if (chr == m_master)
-			{
-				return UpdateFieldFlags.OwnerOnly | UpdateFieldFlags.Public;
-			}
-			if (IsAlliedWith(chr))
-			{
-				return UpdateFieldFlags.GroupOnly | UpdateFieldFlags.Public;
-			}
-			return UpdateFieldFlags.Public;
+			return base.GetUpdateFieldVisibilityFor(chr);
 		}
 
 		protected override UpdateType GetCreationUpdateType(UpdateFieldFlags flags)

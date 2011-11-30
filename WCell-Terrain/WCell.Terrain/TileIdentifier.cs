@@ -29,14 +29,19 @@ namespace WCell.Terrain
 
 		public static readonly TileIdentifier BurningSteppes;
 
-		public static TileIdentifier DefaultTileIdentifier = new TileIdentifier
-		{
-			TileName = "Redridge",
-			MapId = MapId.EasternKingdoms,
-			MapName = "Azeroth",
-			X = 49,
-			Y = 36
-		};
+        public static TileIdentifier DefaultTileIdentifier = new TileIdentifier
+        {
+            //TileName = "Stormwind",
+            //MapId = MapId.EasternKingdoms,
+            //MapName = "Azeroth",
+            //X = 48,
+            //Y = 30,
+            TileName = "Redridge",
+            MapId = MapId.EasternKingdoms,
+            MapName = "Azeroth",
+            X = 49,
+            Y = 36
+        };
 
         static TileIdentifier()
         {
@@ -135,6 +140,20 @@ namespace WCell.Terrain
 
         public TileIdentifier()
         {
+        }
+
+        public TileIdentifier(MapId mapId, Point2D coords) 
+            : this(mapId, coords.X, coords.Y)
+        {
+        }
+
+        public TileIdentifier(MapId mapId, int tileX, int tileY)
+        {
+            TileName = "";
+            MapName = GetName(mapId);
+            MapId = mapId;
+            X = tileX;
+            Y = tileY;
         }
 
         public TileIdentifier(string tileName, MapId mapId, string mapName, int tileX, int tileY)

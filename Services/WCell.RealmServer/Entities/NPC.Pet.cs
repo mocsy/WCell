@@ -2,19 +2,17 @@ using System;
 using System.Collections.Generic;
 using WCell.Constants;
 using WCell.Constants.Pets;
+using WCell.Constants.Spells;
 using WCell.Constants.Updates;
 using WCell.RealmServer.AI;
 using WCell.RealmServer.Formulas;
+using WCell.RealmServer.Handlers;
 using WCell.RealmServer.Items;
 using WCell.RealmServer.Modifiers;
-using WCell.RealmServer.Network;
-using WCell.RealmServer.NPCs;
 using WCell.RealmServer.NPCs.Pets;
+using WCell.RealmServer.Network;
 using WCell.RealmServer.Spells;
 using WCell.RealmServer.Talents;
-using PetNameInvalidReason = WCell.Constants.Pets.PetNameInvalidReason;
-using WCell.Constants.Spells;
-using WCell.RealmServer.Handlers;
 
 namespace WCell.RealmServer.Entities
 {
@@ -576,12 +574,12 @@ namespace WCell.RealmServer.Entities
 			var bar = new uint[PetConstants.PetActionCount];
 			var i = 0;
 
-			byte j;
+			byte j = 0;
 			if (Entry.Spells != null)
 			{
 				var spells = Entry.Spells.GetEnumerator();
 
-				for (j = 0; j < PetConstants.PetSpellCount; j++)
+				for (; j < PetConstants.PetSpellCount; j++)
 				{
 					if (!spells.MoveNext())
 					{
@@ -611,18 +609,8 @@ namespace WCell.RealmServer.Entities
 					}
 				}
 			}
-			else
-			{
-				for (j = 0; j < PetConstants.PetSpellCount; j++)
-				{
-					bar[i++] = new PetActionEntry
-					           	{
-					           		Type = PetActionType.CastSpell2 + j
-					           	}.Raw;
-				}
-			}
-
-			for (; j < PetConstants.PetActionCount; j++)
+            
+            for (; j < PetConstants.PetActionCount; j++)
 			{
 				bar[i++] = new PetActionEntry
 				           	{

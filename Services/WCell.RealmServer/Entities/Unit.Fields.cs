@@ -17,6 +17,7 @@
 using System;
 using WCell.Constants;
 using WCell.Constants.Factions;
+using WCell.Constants.Items;
 using WCell.Constants.Misc;
 using WCell.Constants.NPCs;
 using WCell.Constants.Pets;
@@ -25,16 +26,15 @@ using WCell.Constants.Updates;
 using WCell.Core;
 using WCell.RealmServer.Factions;
 using WCell.RealmServer.Formulas;
-using WCell.RealmServer.Modifiers;
 using WCell.RealmServer.Handlers;
+using WCell.RealmServer.Modifiers;
+using WCell.RealmServer.NPCs;
 using WCell.RealmServer.NPCs.Vehicles;
 using WCell.RealmServer.RacesClasses;
 using WCell.RealmServer.Spells;
 using WCell.RealmServer.Spells.Auras;
 using WCell.RealmServer.Talents;
 using WCell.Util;
-using WCell.RealmServer.NPCs;
-using WCell.Constants.Items;
 using WCell.Util.Graphics;
 
 namespace WCell.RealmServer.Entities
@@ -88,6 +88,12 @@ namespace WCell.RealmServer.Entities
 				SetEntityId(UnitFields.CHARMEDBY, value != null ? value.EntityId : EntityId.Zero);
 				Master = value;
 			}
+		}
+
+		public Character CharmerCharacter
+		{
+			get { return m_master as Character; }
+			set { Charmer = value; }
 		}
 
 		public bool IsCharmed
@@ -1294,7 +1300,15 @@ namespace WCell.RealmServer.Entities
 
 		public ShapeshiftMask ShapeshiftMask
 		{
-			get { return (ShapeshiftMask)(1 << (int)(ShapeshiftForm - 1)); }
+			get
+			{
+				// TODO: Employ unconditional function instead
+				if (ShapeshiftForm == ShapeshiftForm.Normal)
+				{
+					return ShapeshiftMask.None;
+				}
+				return (ShapeshiftMask)(1 << (int)(ShapeshiftForm - 1));
+			}
 		}
 		#endregion
 
@@ -1441,7 +1455,12 @@ namespace WCell.RealmServer.Entities
 			get { return GetInt32(UnitFields.MAXHEALTH); }
 			internal set
 			{
-				SetInt32(UnitFields.MAXHEALTH, value);
+                if (Health > value)
+                {
+                    Health = value;
+                }
+
+			    SetInt32(UnitFields.MAXHEALTH, value);
 			}
 		}
 

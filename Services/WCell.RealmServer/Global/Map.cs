@@ -16,50 +16,45 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using WCell.Constants.Factions;
-using WCell.Core.Paths;
-using WCell.RealmServer.GameObjects.Spawns;
-using WCell.RealmServer.NPCs.Spawns;
-using WCell.RealmServer.Res;
-using WCell.RealmServer.Spawns;
-using WCell.Util.Collections;
 using NLog;
 using WCell.Constants;
+using WCell.Constants.Achievements;
+using WCell.Constants.Factions;
+using WCell.Constants.GameObjects;
 using WCell.Constants.Misc;
+using WCell.Constants.NPCs;
 using WCell.Constants.Spells;
 using WCell.Constants.Updates;
 using WCell.Constants.World;
 using WCell.Core;
-using WCell.Core.Initialization;
+using WCell.Core.Terrain;
+using WCell.Core.Timers;
+using WCell.Intercommunication.DataTypes;
+using WCell.RealmServer.AI;
 using WCell.RealmServer.Battlegrounds;
 using WCell.RealmServer.Battlegrounds.Arenas;
-using WCell.RealmServer.Handlers;
-using WCell.RealmServer.Misc;
-using WCell.Util.Graphics;
-using WCell.Core.Terrain;
-using WCell.Util.Threading;
-using WCell.Util.Threading.TaskParallel;
-using WCell.Core.Timers;
 using WCell.RealmServer.Chat;
 using WCell.RealmServer.Entities;
 using WCell.RealmServer.Formulas;
 using WCell.RealmServer.GameObjects;
 using WCell.RealmServer.GameObjects.GOEntries;
+using WCell.RealmServer.GameObjects.Spawns;
+using WCell.RealmServer.Handlers;
+using WCell.RealmServer.Misc;
 using WCell.RealmServer.NPCs;
-using WCell.Core.Terrain.Paths;
+using WCell.RealmServer.NPCs.Spawns;
+using WCell.RealmServer.Res;
+using WCell.RealmServer.Spawns;
 using WCell.Util;
+using WCell.Util.Collections;
+using WCell.Util.Graphics;
 using WCell.Util.NLog;
+using WCell.Util.Threading;
+using WCell.Util.Threading.TaskParallel;
 using WCell.Util.Variables;
-using WCell.Intercommunication.DataTypes;
-using WCell.Constants.GameObjects;
-using WCell.Constants.NPCs;
-using WCell.RealmServer.AI;
-using WCell.Constants.Achievements;
-
 
 namespace WCell.RealmServer.Global
 {
@@ -832,35 +827,35 @@ namespace WCell.RealmServer.Global
 			get { return m_gosSpawned; }
 		}
 
-        public void RemoveNPCSpawnPoolLater(NPCSpawnPoolTemplate templ)
-        {
-            AddMessage(() => RemoveNPCSpawnPoolNow(templ));
-        }
+		public void RemoveNPCSpawnPool(NPCSpawnPoolTemplate templ)
+		{
+			AddMessage(() => RemoveNPCSpawnPoolNow(templ));
+		}
 
-        public void RemoveNPCSpawnPoolNow(NPCSpawnPoolTemplate templ)
-        {
-            NPCSpawnPool existingPool;
-            if (m_npcSpawnPools.TryGetValue(templ.PoolId, out existingPool))
-            {
-                existingPool.RemovePoolNow();
-            }
-        }
+		public void RemoveNPCSpawnPoolNow(NPCSpawnPoolTemplate templ)
+		{
+			NPCSpawnPool existingPool;
+			if (m_npcSpawnPools.TryGetValue(templ.PoolId, out existingPool))
+			{
+				existingPool.RemovePoolNow();
+			}
+		}
 
-        public void RemoveGOSpawnPoolLater(GOSpawnPoolTemplate templ)
-        {
-            AddMessage(() => RemoveGOSpawnPoolNow(templ));
-        }
+		public void RemoveGOSpawnPool(GOSpawnPoolTemplate templ)
+		{
+			AddMessage(() => RemoveGOSpawnPoolNow(templ));
+		}
 
-        public void RemoveGOSpawnPoolNow(GOSpawnPoolTemplate templ)
-        {
-            GOSpawnPool existingPool;
-            if (m_goSpawnPools.TryGetValue(templ.PoolId, out existingPool))
-            {
-                existingPool.RemovePoolNow();
-            }
-        }
+		public void RemoveGOSpawnPoolNow(GOSpawnPoolTemplate templ)
+		{
+			GOSpawnPool existingPool;
+			if (m_goSpawnPools.TryGetValue(templ.PoolId, out existingPool))
+			{
+				existingPool.RemovePoolNow();
+			}
+		}
 
-		public void AddNPCSpawnPoolLater(NPCSpawnPoolTemplate templ)
+		public void AddNPCSpawnPool(NPCSpawnPoolTemplate templ)
 		{
 			AddMessage(() => AddNPCSpawnPoolNow(templ));
 		}
@@ -890,10 +885,10 @@ namespace WCell.RealmServer.Global
 			}
 		}
 
-        public void AddGOSpawnPoolLater(GOSpawnPoolTemplate templ)
-        {
-            AddMessage(() => AddGOSpawnPoolNow(templ));
-        }
+		public void AddGOSpawnPoolLater(GOSpawnPoolTemplate templ)
+		{
+			AddMessage(() => AddGOSpawnPoolNow(templ));
+		}
 
 		public GOSpawnPool AddGOSpawnPoolNow(GOSpawnPoolTemplate templ)
 		{
@@ -1374,7 +1369,7 @@ namespace WCell.RealmServer.Global
 					try
 					{
 						// Update Object
-						var minObjUpdateDelta = UpdatePriorityMillis[(int) priority];
+						var minObjUpdateDelta = UpdatePriorityMillis[(int)priority];
 						var objUpdateDelta = (updateStart - obj.LastUpdateTime).ToMilliSecondsInt();
 
 						if (objUpdateDelta >= minObjUpdateDelta)
@@ -1390,7 +1385,7 @@ namespace WCell.RealmServer.Global
 						// Fail-safe:
 						if (obj is Unit)
 						{
-							var unit = (Unit) obj;
+							var unit = (Unit)obj;
 							if (unit.Brain != null)
 							{
 								unit.Brain.IsRunning = false;
@@ -1398,7 +1393,7 @@ namespace WCell.RealmServer.Global
 						}
 						if (obj is Character)
 						{
-							((Character) obj).Client.Disconnect();
+							((Character)obj).Client.Disconnect();
 						}
 						else
 						{
@@ -1407,7 +1402,7 @@ namespace WCell.RealmServer.Global
 					}
 				}
 
-				if (m_tickCount%CharacterUpdateEnvironmentTicks == 0)
+				if (m_tickCount % CharacterUpdateEnvironmentTicks == 0)
 				{
 					UpdateCharacters();
 				}
@@ -1424,7 +1419,7 @@ namespace WCell.RealmServer.Global
 				var newUpdateDelta = updateEnd - updateStart;
 
 				// weigh old update-time 9 times and new update-time once
-				_avgUpdateTime = ((_avgUpdateTime*9) + (float) (newUpdateDelta).TotalMilliseconds)/10;
+				_avgUpdateTime = ((_avgUpdateTime * 9) + (float)(newUpdateDelta).TotalMilliseconds) / 10;
 
 				// make sure to unset the ID *before* enqueuing the task in the ThreadPool again
 				Interlocked.Exchange(ref m_currentThreadId, 0);
@@ -2548,13 +2543,24 @@ namespace WCell.RealmServer.Global
 
 		#region IGenericChatTarget Members
 
+		/// <summary>
+		/// Sends the given message to everyone
+		/// </summary>
 		public void SendMessage(string message)
 		{
-			AddMessage(new Message1<Map>(
-							this, rgn => ChatMgr.SendSystemMessage(rgn.m_characters, message)
-						));
+			ExecuteInContext(() =>
+			{
+				m_characters.SendSystemMessage(message);
+				ChatMgr.ChatNotify(null, message, ChatLanguage.Universal, ChatMsgType.System, this);
+			});
+		}
 
-			ChatMgr.ChatNotify(null, message, ChatLanguage.Universal, ChatMsgType.System, this);
+		/// <summary>
+		/// Sends the given message to everyone
+		/// </summary>
+		public void SendMessage(string message, params object[] args)
+		{
+			SendMessage(string.Format(message, args));
 		}
 
 		#endregion
@@ -2565,7 +2571,7 @@ namespace WCell.RealmServer.Global
 		/// <param name="action"></param>
 		protected internal virtual void OnPlayerDeath(IDamageAction action)
 		{
-			if (action.Attacker.IsPvPing)
+            if (action.Attacker != null && action.Attacker.IsPvPing)
 			{
 				if (action.Victim.YieldsXpOrHonor)
 				{
@@ -2574,21 +2580,24 @@ namespace WCell.RealmServer.Global
 					OnHonorableKill(action);
 				}
 			}
-			if (action.Victim is Character)
-			{
-				var chr = action.Victim as Character;
-				chr.Achievements.CheckPossibleAchievementUpdates(AchievementCriteriaType.DeathAtMap, (uint)MapId, 1);
 
-				if (action.Attacker is Character)
-				{
-					var killer = action.Attacker as Character;
-					chr.Achievements.CheckPossibleAchievementUpdates(AchievementCriteriaType.KilledByPlayer, (uint)killer.FactionGroup, 1);
-				}
-				else
-				{
-					chr.Achievements.CheckPossibleAchievementUpdates(AchievementCriteriaType.KilledByCreature, action.Attacker.EntryId, 1);
-				}
-			}
+		    if (!(action.Victim is Character))
+                return;
+
+		    var chr = action.Victim as Character;
+		    chr.Achievements.CheckPossibleAchievementUpdates(AchievementCriteriaType.DeathAtMap, (uint)MapId, 1);
+
+            if (action.Attacker == null)
+                return;
+
+		    if (action.Attacker is Character)
+		    {
+                chr.Achievements.CheckPossibleAchievementUpdates(AchievementCriteriaType.KilledByPlayer, (uint)action.Attacker.FactionGroup, 1);
+		    }
+		    else
+		    {
+		        chr.Achievements.CheckPossibleAchievementUpdates(AchievementCriteriaType.KilledByCreature, action.Attacker.EntryId, 1);
+		    }
 		}
 
 		/// <summary>

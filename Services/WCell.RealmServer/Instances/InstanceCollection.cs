@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Cell.Core;
-using WCell.Constants;
+using NLog;
 using WCell.Constants.World;
+using WCell.RealmServer.Chat;
 using WCell.RealmServer.Database;
 using WCell.RealmServer.Entities;
 using WCell.RealmServer.Global;
-using WCell.RealmServer.Handlers;
-using NLog;
-using WCell.RealmServer.Chat;
 using WCell.Util.ObjectPools;
 
 namespace WCell.RealmServer.Instances
@@ -179,7 +176,7 @@ namespace WCell.RealmServer.Instances
 			if (binding != null)
 			{
 				var instance = InstanceMgr.Instances.GetInstance(binding.MapId, binding.InstanceId);
-				if (instance.IsActive)
+                if (instance != null && instance.IsActive)
 				{
 					return instance as BaseInstance;
 				}

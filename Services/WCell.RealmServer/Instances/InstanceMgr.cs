@@ -1,20 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
+using NLog;
 using WCell.Constants;
+using WCell.Constants.World;
 using WCell.Core.Initialization;
+using WCell.RealmServer.Database;
 using WCell.RealmServer.Entities;
 using WCell.RealmServer.Global;
 using WCell.RealmServer.Groups;
 using WCell.RealmServer.Handlers;
-using NLog;
 using WCell.Util;
 using WCell.Util.DynamicAccess;
-using WCell.Constants.World;
 using WCell.Util.Graphics;
 using WCell.Util.Variables;
-using WCell.RealmServer.Database;
 
 namespace WCell.RealmServer.Instances
 {
@@ -133,6 +131,7 @@ namespace WCell.RealmServer.Instances
 					// set faction & leader
 					instance.m_OwningFaction = creator.FactionGroup;
 					instance.Owner = creator.InstanceLeader;
+				    instance.IsActive = true;
 				}
 				instance.InitMap(template.MapTemplate);
 				Instances.AddInstance(instance.MapId, instance);
@@ -206,7 +205,7 @@ namespace WCell.RealmServer.Instances
 					}
 				}
 			}
-			else
+			else if(!chr.GodMode)
 			{
 				if (!CheckFull(instance, chr))
 				{
@@ -216,6 +215,12 @@ namespace WCell.RealmServer.Instances
 				// Check that the Raid member has the same instance as the leader
 				if (isRaid)
 				{
+                    if(group == null)
+                    {
+                        MovementHandler.SendTransferFailure(chr.Client, instance.Id, MapTransferError.TRANSFER_ABORT_NEED_GROUP);
+                        return false;
+                    }
+
 					var leaderRaid = group.InstanceLeaderCollection.GetBinding(mapTemplate.Id, BindingType.Hard);
 					var playerRaid = instances.GetBinding(mapTemplate.Id, BindingType.Hard);
 

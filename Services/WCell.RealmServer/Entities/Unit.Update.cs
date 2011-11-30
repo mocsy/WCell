@@ -19,7 +19,6 @@ using WCell.Constants.Updates;
 using WCell.Core.Network;
 using WCell.RealmServer.UpdateFields;
 using WCell.Util;
-using WCell.Constants.Spells;
 using WCell.Util.Graphics;
 
 namespace WCell.RealmServer.Entities
@@ -42,6 +41,10 @@ namespace WCell.RealmServer.Entities
 			if (chr == m_master)
 			{
 				return UpdateFieldFlags.OwnerOnly | UpdateFieldFlags.Public;
+			}
+			if (IsAlliedWith(chr))
+			{
+				return UpdateFieldFlags.GroupOnly | UpdateFieldFlags.Public;
 			}
 			return UpdateFieldFlags.Public;
 		}

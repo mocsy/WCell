@@ -5,18 +5,17 @@ using System.Text;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using WCell.Terrain.GUI.Util;
+using WVector3 = WCell.Util.Graphics.Vector3;
 
 namespace WCell.Terrain.GUI.Renderers
 {
 	public class LiquidRenderer : RendererBase
 	{
-		private static Color WaterColor
-		{
-			//get { return Color.DarkSlateGray; }
-			get { return new Color(0, 0, 70, 50); }
-		}
+		private static Color WaterColor = new Color(0, 0, 70, 50);
+	    
+	    private TerrainTile tile;
 
-		readonly BlendState alphaBlendState = new BlendState()
+        readonly BlendState alphaBlendState = new BlendState
 		{
 			AlphaBlendFunction = BlendFunction.Add,
 			AlphaSourceBlend = Blend.SourceAlpha,
@@ -25,51 +24,57 @@ namespace WCell.Terrain.GUI.Renderers
 			ColorDestinationBlend = Blend.InverseSourceAlpha
 		};
 
-		public LiquidRenderer(Game game) : base(game)
+		public LiquidRenderer(Game game, TerrainTile tile) : base(game)
 		{
+		    this.tile = tile;
 		}
 
 		public override void Draw(GameTime gameTime)
 		{
-			var oldBlendState = Game.GraphicsDevice.BlendState;
+		    var graphics = Game.GraphicsDevice;
+            var oldBlendState = graphics.BlendState;
+            var oldRasterState = graphics.RasterizerState;
+            var oldDepthStencilState = graphics.DepthStencilState;
 
-			Game.GraphicsDevice.BlendState = alphaBlendState;
-			base.Draw(gameTime);
-			Game.GraphicsDevice.BlendState = oldBlendState;
+			graphics.BlendState = alphaBlendState;
+			
+            base.Draw(gameTime);
+
+            graphics.BlendState = oldBlendState;
+            graphics.RasterizerState = oldRasterState;
+            graphics.DepthStencilState = oldDepthStencilState;
 		}
 
 		protected override void BuildVerticiesAndIndicies()
 		{
-			var viewer = (TerrainViewer) Game;
-			var tile = viewer.Tile;
-
-			List<int> indices;
+		    List<int> indices;
 			using (LargeObjectPools.IndexListPool.Borrow(out indices))
 			{
 				List <WCell.Util.Graphics.Vector3> vertices;
 				
 				using (LargeObjectPools.Vector3ListPool.Borrow(out vertices))
 				{
-					var tempVertices = new List<VertexPositionNormalColored>();
+				    indices.Clear();
+				    vertices.Clear();
+				    var tempVertices = new List<VertexPositionNormalColored>();
+				    
+                    tile.GenerateLiquidMesh(indices, vertices);
 
-					tile.GenerateLiquidMesh(indices, vertices);
+				    if (vertices.Count == 0) return;
 
-					if (vertices != null)
-					{	
-						for (var v = 0; v < vertices.Count; v++)
-						{
-							var vertex = vertices[v];
-							var vertexPosNmlCol = new VertexPositionNormalColored(vertex.ToXna(),
-							                                                      WaterColor,
-							                                                      Vector3.Zero);
-							tempVertices.Add(vertexPosNmlCol);
-						}
-					}
+				    foreach (var vertex in vertices)
+				    {
+				        var vertexPosNmlCol = new VertexPositionNormalColored(vertex.ToXna(),
+				                                                              WaterColor,
+				                                                              Vector3.Zero);
+				        tempVertices.Add(vertexPosNmlCol);
+				    }
 
-					_cachedIndices = indices.ToArray();
-					_cachedVertices = tempVertices.ToArray();
+				    _cachedIndices = indices.ToArray();
+				    _cachedVertices = tempVertices.ToArray();
 				}
 			}
+
 			_renderCached = true;
 		}
 	}

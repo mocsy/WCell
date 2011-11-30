@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 using WCell.Terrain.MPQ;
+using WCell.Terrain.MPQ.WMOs;
 using WCell.Util;
 using WCell.Util.Graphics;
 
@@ -9,8 +11,7 @@ namespace WCell.Terrain
 {
 	public static class Extensions
 	{
-
-		public static OffsetLocation ReadOffsetLocation(this BinaryReader br)
+        public static OffsetLocation ReadOffsetLocation(this BinaryReader br)
 		{
 			return new OffsetLocation
 			{
@@ -90,5 +91,30 @@ namespace WCell.Terrain
 				writer.Write(item);
 			}
 		}
+
+        public static void SetAllElementsTo(this List<int> list, int to)
+        {
+			var count = list.Count;
+            list.Clear();
+            for (var i = 0; i < count; i++)
+            {
+                list.Add(to);
+            }
+        }
+
+        public static void SwapAtIndex(this List<int> list, int idx1, int idx2)
+        {
+            if (idx1 >= list.Count) throw new ArgumentOutOfRangeException();
+            if (idx2 >= list.Count) throw new ArgumentOutOfRangeException();
+
+            var temp = list[idx1];
+            list[idx1] = list[idx2];
+            list[idx2] = temp;
+        }
+
+        public static bool HasAnyFlag(this MOPY.MaterialFlags flags, MOPY.MaterialFlags otherFlags)
+        {
+            return (flags & otherFlags) != 0;
+        }
 	}
 }

@@ -6,6 +6,7 @@ using WCell.Constants.World;
 using WCell.Terrain.MPQ.ADTs;
 using WCell.Util;
 using WCell.Util.Graphics;
+using QSlim;
 
 namespace WCell.Terrain.MPQ
 {
@@ -89,7 +90,37 @@ namespace WCell.Terrain.MPQ
 
 		private static readonly bool[,] EmptyHolesArray = new bool[4, 4];
 
-		public void GenerateHeightVertexAndIndices()
+        public void GenerateMapWithQSlimSimplification()
+        {
+            List<Vector3> tileVerts;
+            List<int> tileIndices;
+            GetTerrainMesh(out tileVerts, out tileIndices);
+
+            var slim = new QSlim.QSlim(tileVerts, tileIndices);
+            var numTris = (tileIndices.Count / 3);
+            slim.Simplify(numTris / 2);
+
+            List<Vector3> newVerts;
+            List<int> newIdx;
+            slim.GenerateOutput(out newVerts, out newIdx);
+
+            AppendWMOandM2Info(ref newVerts, ref newIdx);
+            TerrainIndices = newIdx.ToArray();
+            TerrainVertices = newVerts.ToArray();
+        }
+
+	    public void GenerateMapWithNoSimplification()
+        {
+            List<Vector3> tileVerts;
+            List<int> tileIndices;
+            GetTerrainMesh(out tileVerts, out tileIndices);
+            
+            AppendWMOandM2Info(ref tileVerts, ref tileIndices);
+            TerrainIndices = tileIndices.ToArray();
+            TerrainVertices = tileVerts.ToArray();
+        }
+
+	    public void GenerateMapWithTerraSimplification()
 		{
 			const int heightsPerTileSide = TerrainConstants.UnitsPerChunkSide * TerrainConstants.ChunksPerTileSide;
 			var tileHeights = new float[heightsPerTileSide + 1, heightsPerTileSide + 1];
@@ -102,7 +133,7 @@ namespace WCell.Terrain.MPQ
 				{
 					var chunk = Chunks[x, y];
 					var heights = chunk.Heights.GetLowResMapMatrix();
-					var holes = (chunk.HolesMask > 0) ? chunk.HolesMap : EmptyHolesArray;
+                    var holes = (chunk.HolesMask > 0) ? chunk.HolesMap : EmptyHolesArray;
 
 					// Add the height map values, inserting them into their correct positions
 					for (var unitRow = 0; unitRow <= TerrainConstants.UnitsPerChunkSide; unitRow++)
@@ -112,7 +143,7 @@ namespace WCell.Terrain.MPQ
 							var tileX = x * TerrainConstants.UnitsPerChunkSide + unitRow;
 							var tileY = y * TerrainConstants.UnitsPerChunkSide + unitCol;
 
-							tileHeights[tileX, tileY] = heights[unitCol, unitRow] + chunk.MedianHeight;
+							tileHeights[tileX, tileY] = heights[unitRow, unitCol] + chunk.MedianHeight;
 
 							if (unitCol == TerrainConstants.UnitsPerChunkSide) continue;
 							if (unitRow == TerrainConstants.UnitsPerChunkSide) continue;
@@ -176,11 +207,11 @@ namespace WCell.Terrain.MPQ
 			// TODO: Pool huge lists & arrays
 			List<Vector3> newVertices;
 
-			var indices = new List<int>();
+			List<int> indices;
 			terra.GenerateOutput(allHoleIndices, out newVertices, out indices);
 
 			// convert
-			for (int i = 0; i < newVertices.Count; i++)
+			for (var i = 0; i < newVertices.Count; i++)
 			{
 				var vertex = newVertices[i];
 				var xPos = TerrainConstants.CenterPoint - (TileX * TerrainConstants.TileSize) - (vertex.X * TerrainConstants.UnitSize);
@@ -188,26 +219,7 @@ namespace WCell.Terrain.MPQ
 				newVertices[i] = new Vector3(xPos, yPos, vertex.Z);
 			}
 
-			// Add WMO & M2 vertices
-			foreach (var wmo in WMOs)
-			{
-				var offset = newVertices.Count;
-				newVertices.AddRange(wmo.WmoVertices);
-				foreach (var index in wmo.WmoIndices)
-				{
-					indices.Add(offset + index);
-				}
-			}
-
-			foreach (var m2 in M2s)
-			{
-				var offset = newVertices.Count;
-				newVertices.AddRange(m2.Vertices);
-				foreach (var index in m2.Indices)
-				{
-					indices.Add(offset + index);
-				}
-			}
+	        AppendWMOandM2Info(ref newVertices, ref indices);
 
 			TerrainIndices = indices.ToArray();
 			TerrainVertices = newVertices.ToArray();
@@ -315,13 +327,12 @@ namespace WCell.Terrain.MPQ
 			var yPos = TerrainConstants.CenterPoint - (TileY * TerrainConstants.TileSize) - (chunkY * TerrainConstants.ChunkSize) -
 					   (unitY * TerrainConstants.UnitSize);
 
-			var zPos = mcnk.Heights.GetLowResMapMatrix()[unitY, unitX] + mcnk.MedianHeight;
+			var zPos = mcnk.Heights.GetLowResMapMatrix()[unitX, unitY] + mcnk.MedianHeight;
 
 			return new Vector3(xPos, yPos, zPos);
 		}
 
-
-		/// <summary>
+        /// <summary>
 		/// Adds the rendering indices to the provided list for the MapChunk given by:
 		/// </summary>
 		/// <param name="indexY">The y index of the map chunk.</param>
@@ -381,32 +392,296 @@ namespace WCell.Terrain.MPQ
 			}
 		}
 
-		#endregion
+        private void GetTerrainMesh(out List<Vector3> tileVerts, out List<int> tileIndices)
+        {
+            const int heightsPerTileSide = TerrainConstants.UnitsPerChunkSide * TerrainConstants.ChunksPerTileSide;
+            var tileVertLocations = new int[heightsPerTileSide + 1, heightsPerTileSide + 1];
+            var tileHolesMap = new bool[heightsPerTileSide + 1, heightsPerTileSide + 1];
+            tileVerts = new List<Vector3>();
 
+            for (var i = 0; i < (heightsPerTileSide + 1); i++)
+            {
+                for (var j = 0; j < (heightsPerTileSide + 1); j++)
+                {
+                    tileVertLocations[i, j] = -1;
+                }
+            }
+
+            for (var x = 0; x < TerrainConstants.ChunksPerTileSide; x++)
+            {
+                for (var y = 0; y < TerrainConstants.ChunksPerTileSide; y++)
+                {
+                    var chunk = Chunks[x, y];
+                    var heights = chunk.Heights.GetLowResMapMatrix();
+                    var holes = (chunk.HolesMask > 0) ? chunk.HolesMap : EmptyHolesArray;
+
+                    // Add the height map values, inserting them into their correct positions
+                    for (var unitX = 0; unitX <= TerrainConstants.UnitsPerChunkSide; unitX++)
+                    {
+                        for (var unitY = 0; unitY <= TerrainConstants.UnitsPerChunkSide; unitY++)
+                        {
+                            var tileX = (x*TerrainConstants.UnitsPerChunkSide) + unitX;
+                            var tileY = (y*TerrainConstants.UnitsPerChunkSide) + unitY;
+
+                            var vertIndex = tileVertLocations[tileX, tileY];
+                            if (vertIndex == -1)
+                            {
+                                var xPos = TerrainConstants.CenterPoint
+                                           - (TileX * TerrainConstants.TileSize)
+                                           - (tileX * TerrainConstants.UnitSize);
+                                var yPos = TerrainConstants.CenterPoint
+                                           - (TileY * TerrainConstants.TileSize)
+                                           - (tileY * TerrainConstants.UnitSize);
+                                var zPos = (heights[unitX, unitY] + chunk.MedianHeight);
+                                tileVertLocations[tileX, tileY] = tileVerts.Count;
+                                tileVerts.Add(new Vector3(xPos, yPos, zPos));
+                            }
+
+
+                            if (unitY == TerrainConstants.UnitsPerChunkSide) continue;
+                            if (unitX == TerrainConstants.UnitsPerChunkSide) continue;
+
+                            tileHolesMap[tileX, tileY] = holes[unitX / 2, unitY / 2];
+                        }
+                    }
+                }
+            }
+
+            tileIndices = new List<int>();
+            for (var tileX = 0; tileX < heightsPerTileSide; tileX++)
+            {
+                for (var tileY = 0; tileY < heightsPerTileSide; tileY++)
+                {
+                    if (tileHolesMap[tileX, tileY]) continue;
+                    /*This 3 index makes the top triangle
+                                *
+                                *0--1--2
+                                *| /| /
+                                *|/ |/ 
+                                *9  10 11
+                                */
+                    var vertId0 = tileVertLocations[tileX, tileY];
+                    var vertId1 = tileVertLocations[tileX, tileY + 1];
+                    var vertId9 = tileVertLocations[tileX + 1, tileY];
+                    tileIndices.Add(vertId0);
+                    tileIndices.Add(vertId1);
+                    tileIndices.Add(vertId9);
+                    
+                    /*This 3 index makes the bottom triangle
+                                 *
+                                 *0  1   2
+                                 *  /|  /|
+                                 * / | / |
+                                 *9--10--11
+                                 */
+                    var vertId10 = tileVertLocations[tileX + 1, tileY + 1];
+                    tileIndices.Add(vertId1);
+                    tileIndices.Add(vertId10);
+                    tileIndices.Add(vertId9);
+                }
+            }
+        }
+
+		private void AppendWMOandM2Info(ref List<Vector3> verts, ref List<int> indices)
+		{
+            if (verts == null) verts = new List<Vector3>();
+            if (indices == null) indices = new List<int>();
+
+            var clipper = new MeshClipper(Bounds);
+            List<Vector3> newVertices;
+            List<int> newIndices;
+		    
+            // Add WMO & M2 vertices
+		    int offset;
+		    foreach (var wmo in WMOs)
+		    {
+		        clipper.ClipMesh(wmo.WmoVertices, wmo.WmoIndices, out newVertices, out newIndices);
+                
+                offset = verts.Count;
+                if (newVertices.Count > 0 && newIndices.Count > 0)
+                {
+                    verts.AddRange(newVertices);
+                    foreach (var index in newIndices)
+                    {
+                        indices.Add(offset + index);
+                    }
+                }
+
+                clipper.ClipMesh(wmo.WmoM2Vertices, wmo.WmoM2Indices, out newVertices, out newIndices);
+
+                offset = verts.Count;
+                if (newVertices.Count <= 0 || newIndices.Count <= 0) continue;
+                verts.AddRange(newVertices);
+                foreach (var index in newIndices)
+                {
+                    indices.Add(offset + index);
+                }
+            }
+
+		    foreach (var m2 in M2s)
+		    {
+		        clipper.ClipMesh(m2.Vertices, m2.Indices, out newVertices, out newIndices);
+
+		        offset = verts.Count;
+		        if (newVertices.Count == 0 || newIndices.Count == 0) continue;
+
+		        verts.AddRange(newVertices);
+		        foreach (var index in newIndices)
+		        {
+		            indices.Add(offset + index);
+		        }
+		    }
+		}
+        #endregion
+
+        public Vector3 GetSurfaceNormal(Point2D chunkCoord, Point2D unitCoord, HeightMapFraction heightMapFraction)
+        {
+            if (Chunks == null) return Vector3.Zero;
+
+            var chunk = Chunks[chunkCoord.X, chunkCoord.Y];
+            if (chunk == null) return Vector3.Zero;
+
+            if (chunk.HolesMap[unitCoord.X / 2, unitCoord.Y / 2]) return Vector3.Zero;
+
+            if (chunk.IsFlat) return Vector3.Up;
+
+            var outerHeights = chunk.Heights.GetLowResMapMatrix();
+            var innerHeights = chunk.Heights.GetHighResMapMatrix();
+            var v12 = new Vector3(0.5f, 0.5f, innerHeights[unitCoord.X, unitCoord.Y]);
+            var x = heightMapFraction.FractionX;
+            var y = heightMapFraction.FractionY;
+
+            Vector3 a,b;
+            if (y < x)
+            {
+                if (y < (1.0f - x))
+                {
+                    // Upper triangle <h00, h01, h12>
+                    var v00 = new Vector3(0.0f, 0.0f, outerHeights[unitCoord.X, unitCoord.Y]);
+                    var v01 = new Vector3(0.0f, 1.0f, outerHeights[unitCoord.X + 1, unitCoord.Y]);
+                    a = v00 - v12;
+                    b = v01 - v12;
+                }
+                else
+                {
+                    // Right triangle <h01, h11, h12>
+                    var v01 = new Vector3(0.0f, 1.0f, outerHeights[unitCoord.X + 1, unitCoord.Y]);
+                    var v11 = new Vector3(1.0f, 1.0f, outerHeights[unitCoord.X + 1, unitCoord.Y + 1]);
+                    a = v01 - v12;
+                    b = v11 - v12;
+                }
+            }
+            else
+            {
+                if (y < (1.0f - x))
+                {
+                    // Left triangle <h10, h00, h12>
+                    var v10 = new Vector3(1.0f, 0.0f, outerHeights[unitCoord.X + 1, unitCoord.Y]);
+                    var v00 = new Vector3(0.0f, 0.0f, outerHeights[unitCoord.Y, unitCoord.Y]);
+                    a = v10 - v12;
+                    b = v00 - v12;
+                }
+                else
+                {
+                    // Bottom triangle <h11, h10, h12>
+                    var v11 = new Vector3(1.0f, 1.0f, outerHeights[unitCoord.Y + 1, unitCoord.Y + 1]);
+                    var v10 = new Vector3(1.0f, 0.0f, outerHeights[unitCoord.X + 1, unitCoord.Y]);
+                    a = v11 - v12;
+                    b = v10 - v12;
+                }
+            }
+
+            var nml = Vector3.Cross(b, a);
+            nml.Normalize();
+            return nml;
+        }
 
 		public float GetInterpolatedHeight(Point2D chunkCoord, Point2D unitCoord, HeightMapFraction heightMapFraction)
 		{
 			// Height stored as: h5 - its v8 grid, h1-h4 - its v9 grid
-			// +--------------> X
-			// | h1--------h2   Coordinates are:
-			// | |    |    |     h1 0,0
-			// | |  1 |  2 |     h2 0,1
-			// | |----h5---|     h3 1,0
-			// | |  3 |  4 |     h4 1,1
-			// | |    |    |     h5 1/2,1/2
-			// | h3--------h4
-			// V Y
+			// h00------h01   Coordinates are:
+			// | \      / |     h00 0,0
+			// |  \  1 /  |     h01 0,1
+			// |   \  /   |
+            // | 4  h12 2 |     h10 1,0
+			// |   /  \   |     h11 1,1
+			// |  / 3  \  |     h12 1/2,1/2
+            // | /      \ |
+			// h10------h11
 			if (Chunks == null) return float.NaN;
 
 			var chunk = Chunks[chunkCoord.X, chunkCoord.Y];
 			if (chunk == null) return float.NaN;
 
+            if (chunk.HolesMap[unitCoord.X / 2, unitCoord.Y / 2]) return float.NaN;
+
 			var medianHeight = chunk.MedianHeight;
 			if (chunk.IsFlat) return medianHeight;
 
+            // Using simplified Barycentric Coordinate coordinates, this actually becomes quite simple.
+		    var outerHeights = chunk.Heights.GetLowResMapMatrix();
+		    var innerHeights = chunk.Heights.GetHighResMapMatrix();
+            var h12 = innerHeights[unitCoord.X, unitCoord.Y];
+		    var x = heightMapFraction.FractionX;
+		    var y = heightMapFraction.FractionY;
 
-			// TODO: Fix interpolated height
-			return medianHeight;
+		    float heightOffset;
+            if (y < x)
+            {
+                if (y < (1.0f - x))
+                {
+                    // Upper triangle <h00, h01, h12>
+                    var h00 = outerHeights[unitCoord.X, unitCoord.Y];
+                    var h01 = outerHeights[unitCoord.X + 1, unitCoord.Y];
+
+                    var alpha = 1 - x - y;
+                    var beta  = (y - x);
+                    var gamma = 1.0f - alpha - beta;
+
+                    heightOffset = (alpha*h00 + beta*h01 + gamma*h12);
+                }
+                else
+                {
+                    // Right triangle <h01, h11, h12>
+                    var h01 = outerHeights[unitCoord.X + 1, unitCoord.Y];
+                    var h11 = outerHeights[unitCoord.X + 1, unitCoord.Y + 1];
+
+                    var alpha = (y - x);
+                    var beta  = (x + y - 1.0f);
+                    var gamma = 1.0f - alpha - beta;
+
+                    heightOffset = (alpha*h01 + beta*h11 + gamma*h12);
+                }
+            }
+            else
+            {
+                if (y < (1.0f - x))
+                {
+                    // Left triangle <h10, h00, h12>
+                    var h10 = outerHeights[unitCoord.X + 1, unitCoord.Y];
+                    var h00 = outerHeights[unitCoord.X, unitCoord.Y];
+
+                    var alpha = x - y;
+                    var beta = 1.0f - x - y;
+                    var gamma = 1.0f - alpha - beta;
+
+                    heightOffset = (alpha*h10 + beta*h00 + gamma*h12);
+                }
+                else
+                {
+                    // Bottom triangle <h11, h10, h12>
+                    var h11 = outerHeights[unitCoord.X + 1, unitCoord.Y + 1];
+                    var h10 = outerHeights[unitCoord.X + 1, unitCoord.Y];
+
+                    var alpha = (x + y - 1.0f);
+                    var beta  = x - y;
+                    var gamma = 1.0f - alpha - beta;
+
+                    heightOffset = (alpha*h11 + beta*h10 + gamma*h12);
+                }
+            }
+
+			return medianHeight + heightOffset;
 
 			//// Fixme:  Indexing is backwards.
 			//var heightX = (unitCoord.Y == TerrainConstants.UnitsPerChunkSide)
@@ -540,18 +815,38 @@ namespace WCell.Terrain.MPQ
 
 			var liquidHeights = chunk.LiquidHeights;
 
-			return (liquidHeights == null) ? float.MinValue
-											: liquidHeights[unitCoord.X, unitCoord.Y];
+		    return (liquidHeights == null)
+		               ? float.MinValue
+		               : liquidHeights[unitCoord.X, unitCoord.Y];
 		}
 
 		public override LiquidType GetLiquidType(Point2D chunkCoord)
 		{
-			var chunk = Chunks[chunkCoord.X, chunkCoord.Y];
+            var chunk = Chunks[chunkCoord.X, chunkCoord.Y];
 
-			if (!chunk.HasLiquid)
-				return chunk.LiquidType;
-
-			return chunk.LiquidType;
+		    return (chunk.HasLiquid)
+		               ? chunk.LiquidType
+		               : LiquidType.None;
 		}
+
+        private static void EnsureClockwiseWinding(List<int> indices, List<Vector3> vertices)
+        {
+            if (indices == null || indices.Count < 3) return;
+            if (vertices == null || vertices.Count < 1) return;
+
+            for (var i = 0; i < indices.Count; i += 3)
+            {
+
+                var vert0 = vertices[indices[i + 0]];
+                var vert1 = vertices[indices[i + 1]];
+                var vert2 = vertices[indices[i + 2]];
+
+                if (!GeometryHelpers.IsCounterClockwiseXY(vert0, vert1, vert2)) continue;
+
+                var temp = indices[i + 1];
+                indices[i + 1] = indices[i + 2];
+                indices[i + 2] = temp;
+            }
+        }
     }
 }

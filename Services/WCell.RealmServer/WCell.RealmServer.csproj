@@ -197,6 +197,8 @@
     <Compile Include="Achievements\AchievementProgressRecord.cs" />
     <Compile Include="Achievements\AchievementCriteriaRequirement.cs" />
     <Compile Include="Achievements\AchievementReward.cs" />
+    <Compile Include="AI\Actions\Movement\AIFollowPathAction.cs" />
+    <Compile Include="AI\Actions\Movement\AIWanderMoveAction.cs" />
     <Compile Include="AI\Brains\IAIEventsHandler.cs" />
     <Compile Include="Commands\WorldEventCommands.cs" />
     <Compile Include="Content\IModDataHolder.cs" />
@@ -477,7 +479,6 @@
     <Compile Include="Achievements\Achievements.DBC.cs" />
     <Compile Include="Addons\RealmAddonMgr.cs" />
     <Compile Include="AI\Actions\AIActionCollection.cs" />
-    <Compile Include="AI\Actions\AIActionCreatorCollection.cs" />
     <Compile Include="AI\Actions\AIAction.cs" />
     <Compile Include="AI\Actions\AIActionEnums.cs" />
     <Compile Include="AI\Actions\AIActionQueue.cs" />

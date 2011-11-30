@@ -36,11 +36,11 @@ namespace WCell.Terrain.Serialization
 
 		public static ADT ReadADT(WDT terrain, int x, int y)
 		{
-			var mpqFinder = WCellTerrainSettings.GetDefaultMPQFinder();
-			var filePath = GetFilename(terrain.MapId, x, y);
-			if (!mpqFinder.FileExists(filePath))
+			string filePath;
+			MpqLibrarian mpqFinder;
+			if (!TryGetADTPath(terrain.MapId, x, y, out filePath, out mpqFinder))
 			{
-				log.Error("ADT file does not exist: ", filePath);
+				log.Error("ADT file does not exist: ", filePath); 
 				return null;
 			}
 
@@ -49,6 +49,11 @@ namespace WCell.Terrain.Serialization
 			using (var stream = mpqFinder.OpenFile(filePath))
 			using (var fileReader = new BinaryReader(stream))
 			{
+				if (stream.Length == 0)
+				{
+					log.Error("ADT file is empty: ", filePath); 
+					return null;
+				}
 				ReadMVER(fileReader, adt);
 
 				ReadMHDR(fileReader, adt);
@@ -126,6 +131,17 @@ namespace WCell.Terrain.Serialization
 
 
 			return adt;
+		}
+
+		public static bool TryGetADTPath(MapId mapId, int x, int y, out string filePath, out MpqLibrarian mpqFinder)
+		{
+			mpqFinder = WCellTerrainSettings.GetDefaultMPQFinder();
+			filePath = GetFilename(mapId, x, y);
+			if (!mpqFinder.FileExists(filePath))
+			{
+				return false;
+			}
+			return true;
 		}
 
 		static void ReadMVER(BinaryReader fileReader, ADT adt)
@@ -423,7 +439,7 @@ namespace WCell.Terrain.Serialization
 				for (var i = 0; i < heightMapLen; i++)
 				{
 					water.HeightsArray[i] = fileReader.ReadSingle();
-					if (water.HeightsArray[i] == 0)
+					if (water.HeightsArray[i].IsWithinEpsilon(0.0f))
 					{
 						water.HeightsArray[i] = water.Header.HeightLevel1;
 					}

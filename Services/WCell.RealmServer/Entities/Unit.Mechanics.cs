@@ -17,25 +17,20 @@
 using System;
 using System.Linq;
 using WCell.Constants;
-using WCell.Constants.Items;
 using WCell.Constants.Misc;
-using WCell.Constants.NPCs;
 using WCell.Constants.Spells;
 using WCell.Constants.Updates;
-using WCell.RealmServer.Modifiers;
-using WCell.Util.Graphics;
-using WCell.Util.Threading;
+using WCell.Constants.World;
+using WCell.Core.Initialization;
 using WCell.RealmServer.Global;
 using WCell.RealmServer.Handlers;
 using WCell.RealmServer.Misc;
+using WCell.RealmServer.Modifiers;
 using WCell.RealmServer.Spells;
 using WCell.Util;
-using WCell.Constants.World;
-using WCell.RealmServer.Spells.Auras.Handlers;
-using System.Collections.Generic;
-using WCell.RealmServer.Items;
+using WCell.Util.Graphics;
+using WCell.Util.Threading;
 using WCell.Util.Variables;
-using WCell.Core.Initialization;
 
 namespace WCell.RealmServer.Entities
 {
@@ -154,7 +149,7 @@ namespace WCell.RealmServer.Entities
 		}
 
 		/// <summary>
-		/// Wheter the Unit is allowed to attack and use physical abilities
+		/// Whether the Unit is allowed to attack and use physical abilities
 		/// </summary>
 		public bool CanDoPhysicalActivity
 		{
@@ -181,9 +176,9 @@ namespace WCell.RealmServer.Entities
 		}
 
 		/// <summary>
-		/// Whether the physical state of this Unit allows it to move.
-		/// To stop a character from moving, use IncMechanicCount to increase Rooted or any other movement-effecting Mechanic-school.
-		/// Use HasPermissionToMove to also take Movement-controlling (eg by AI etc) into consideration.
+		/// Whether the physical state and permissions of this Unit allows it to move.
+		/// To control whether a unit is physically capable of moving, use IncMechanicCount/DecMechanicCount to change <see cref="SpellMechanic.Rooted">Rooted</cref> or any other movement-effecting Mechanic.
+		/// However to control it's actual desire/permission to move, use <see cref="HasPermissionToMove"/>.
 		/// </summary>
 		public bool CanMove
 		{
@@ -341,7 +336,7 @@ namespace WCell.RealmServer.Entities
 		}
 
 		/// <summary>
-		/// Increase the mechnanic modifier count for the given SpellMechanic
+        /// Increase the mechanic modifier count for the given SpellMechanic
 		/// </summary>
 		public void IncMechanicCount(SpellMechanic mechanic, bool isCustom = false)
 		{
@@ -378,6 +373,7 @@ namespace WCell.RealmServer.Entities
 						{
 							SpellCast.Cancel();
 						}
+                        StopMoving();
 					}
 
 					// interaction
@@ -387,7 +383,7 @@ namespace WCell.RealmServer.Entities
 						//UnitFlags |= UnitFlags.UnInteractable;
 					}
 
-					// harmfulnes
+					// harmfulness
 					if (m_canHarm && SpellConstants.HarmPreventionMechanics[(int)mechanic])
 					{
 						SetCanHarmState();
@@ -448,7 +444,7 @@ namespace WCell.RealmServer.Entities
 		}
 
 		/// <summary>
-		/// Decrease the mechnanic modifier count for the given SpellMechanic
+        /// Decrease the mechanic modifier count for the given SpellMechanic
 		/// </summary>
 		public void DecMechanicCount(SpellMechanic mechanic, bool isCustom = false)
 		{
@@ -989,6 +985,19 @@ namespace WCell.RealmServer.Entities
 			return m_SpellHitChance != null ? m_SpellHitChance[(int)school] : 0;
 		}
 
+		public int GetHighestSpellHitChanceMod(DamageSchool[] schools)
+		{
+			if (m_SpellHitChance == null)
+			{
+				return 0;
+			}
+
+			var spellHitChanceMods = from school in schools
+									 select m_SpellHitChance[(int)school];
+
+			return spellHitChanceMods.Max();
+		}
+
 		/// <summary>
 		/// Spell avoidance
 		/// </summary>
@@ -1423,11 +1432,11 @@ namespace WCell.RealmServer.Entities
 			// must not be moving or logging out when being teleported
 			CancelMovement();
 			CancelAllActions();
+
 			if (this is Character)
 			{
-			    MovementHandler.SendStopMovementPacket(this);
-
-				((Character)this).CancelLogout();
+			    //MovementHandler.SendStopMovementPacket(this);
+                ((Character)this).CancelLogout();
 			}
 
 			if (ownerMap == map)
@@ -1441,6 +1450,11 @@ namespace WCell.RealmServer.Entities
 					{
 						var chr = ((Character)this);
 						chr.LastPosition = pos;
+
+                        // reset movement flags otherwise
+                        // the unit will continue move with these flags after teleport
+                        MovementFlags = MovementFlags.None;
+                        MovementFlags2 = MovementFlags2.None;
 
 						MovementHandler.SendMoved(chr);
 					}
@@ -1465,6 +1479,10 @@ namespace WCell.RealmServer.Entities
 						var chr = ((Character)this);
 						chr.LastPosition = pos;
 
+                        // reset movement flags otherwise
+                        // the unit will continue move with these flags after teleport
+                        MovementFlags = MovementFlags.None;
+                        MovementFlags2 = MovementFlags2.None;
 						MovementHandler.SendNewWorld(chr.Client, map.Id, ref pos, Orientation);
 					}
 				}

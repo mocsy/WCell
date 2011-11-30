@@ -1,4 +1,4 @@
-/*************************************************************************
+﻿/*************************************************************************
  *
  *   file		: QuestLog.cs
  *   copyright		: (C) The WCell Team
@@ -17,19 +17,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NHibernate.SqlCommand;
-using WCell.Constants.GameObjects;
+using NLog;
 using WCell.Constants.Items;
 using WCell.Constants.Looting;
+using WCell.Constants.NPCs;
 using WCell.Constants.Quests;
 using WCell.Constants.Updates;
+using WCell.Constants;
 using WCell.Core;
 using WCell.RealmServer.Database;
 using WCell.RealmServer.Entities;
 using WCell.RealmServer.Global;
 using WCell.RealmServer.Handlers;
-using WCell.Constants.NPCs;
-using NLog;
 using WCell.RealmServer.Items;
 using WCell.RealmServer.Looting;
 using WCell.RealmServer.Spells;
@@ -621,6 +620,13 @@ namespace WCell.RealmServer.Quests
 						if (interaction.TemplateId.Contains(npc.Entry.Id))
 						{
 							UpdateInteractionCount(quest, interaction, npc);
+						}
+						for (i = 0; i < UnitConstants.MaxKillCredits; i++)
+						{
+							if (interaction.TemplateId.Contains(npc.Entry.KillCreditIds[i]))
+							{
+								UpdateInteractionCount(quest, interaction, npc);
+							}
 						}
 					}
 				}
