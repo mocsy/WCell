@@ -31,12 +31,13 @@ using WCell.Util;
 using WCell.Util.NLog;
 using WCell.RealmServer.Addons;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace WCell.RealmServer.Tests
 {
 	public static class Setup
 	{
-		public static string RunDir = "../../../Run/";
+        private const string RunDir = "../../../../Run/";
 		
 		//public static string RealmServerDir { get { return RunDir + "Debug/"; } }
 
@@ -48,32 +49,32 @@ namespace WCell.RealmServer.Tests
 		public static string WCellRealmServerConsoleExe { get { return RealmServerDebugDir + "WCell.RealmServerConsole.exe"; } }
 
 		public static string ContentDir { get { return RunDir + "Content/"; } }
-		public static string RealmAddonDir { get { return RealmServerDebugDir + "/RealmServerAddons/"; } }
+		public static string RealmAddOnDir { get { return RealmServerDebugDir + "/RealmServerAddons/"; } }
 
 		public static string DumpDir { get { return "Dumps/"; } }
 		public static string LogFile { get { return "LastTestOutput.txt"; } }
 
-		static TextWriter m_output;
+		static TextWriter s_output;
 
-		private static CharacterPool m_hordeCharacterPool;
-		private static CharacterPool m_allianceCharacterPool;
-		static AccountPool m_accountPool;
-		static NPCPool m_npcPool;
-		static ItemPool m_itemPool;
+		private static CharacterPool s_hordeCharacterPool;
+		private static CharacterPool s_allianceCharacterPool;
+		static AccountPool s_accountPool;
+		static NPCPool s_npcPool;
+		static ItemPool s_itemPool;
 		static bool initialized = false;
 
-		static Vector3 m_defaultPos;
+		static Vector3 s_defaultPos;
 
 		#region Properties
 		public static CharacterPool AllianceCharacterPool
 		{
 			get
 			{
-				if (m_allianceCharacterPool == null)
+				if (s_allianceCharacterPool == null)
 				{
-					m_allianceCharacterPool = new CharacterPool(FactionGroup.Alliance);
+					s_allianceCharacterPool = new CharacterPool(FactionGroup.Alliance);
 				}
-				return m_allianceCharacterPool;
+				return s_allianceCharacterPool;
 			}
 		}
 
@@ -81,11 +82,11 @@ namespace WCell.RealmServer.Tests
 		{
 			get
 			{
-				if (m_hordeCharacterPool == null)
+				if (s_hordeCharacterPool == null)
 				{
-					m_hordeCharacterPool = new CharacterPool(FactionGroup.Horde);
+					s_hordeCharacterPool = new CharacterPool(FactionGroup.Horde);
 				}
-				return m_hordeCharacterPool;
+				return s_hordeCharacterPool;
 			}
 		}
 
@@ -93,11 +94,11 @@ namespace WCell.RealmServer.Tests
 		{
 			get
 			{
-				if (m_accountPool == null)
+				if (s_accountPool == null)
 				{
-					m_accountPool = new AccountPool();
+					s_accountPool = new AccountPool();
 				}
-				return m_accountPool;
+				return s_accountPool;
 			}
 		}
 
@@ -105,12 +106,12 @@ namespace WCell.RealmServer.Tests
 		{
 			get
 			{
-				if (m_npcPool == null)
+				if (s_npcPool == null)
 				{
 					EnsureMinimalSetup();
-					m_npcPool = new NPCPool();
+					s_npcPool = new NPCPool();
 				}
-				return m_npcPool;
+				return s_npcPool;
 			}
 		}
 
@@ -118,11 +119,11 @@ namespace WCell.RealmServer.Tests
 		{
 			get
 			{
-				if (m_itemPool == null)
+				if (s_itemPool == null)
 				{
-					m_itemPool = new ItemPool();
+					s_itemPool = new ItemPool();
 				}
-				return m_itemPool;
+				return s_itemPool;
 			}
 		}
 
@@ -183,21 +184,21 @@ namespace WCell.RealmServer.Tests
 		{
 			get
 			{
-				if (m_defaultPos == Vector3.Zero)
+				if (s_defaultPos == Vector3.Zero)
 				{
-					m_defaultPos = new Vector3(1000, 1000, 10);
+					s_defaultPos = new Vector3(1000, 1000, 10);
 				}
-				return m_defaultPos;
+				return s_defaultPos;
 			}
 			set
 			{
-				m_defaultPos = value;
+				s_defaultPos = value;
 			}
 		}
 
 		public static TextWriter TestOutput
 		{
-			get { return m_output; }
+			get { return s_output; }
 		}
 		#endregion
 
@@ -223,10 +224,12 @@ namespace WCell.RealmServer.Tests
 				{
 					// Maybe the CWD randomly moved to Run/Debug/TestResults/TestRunName123424239453285894983435/Out/
 					// Use Directory.SetCurrentDirectory(...); to change it
-					RunDir = "../../../../";
+					//RunDir = "../../../../";
 					if (!Directory.Exists(RunDir))
 					{
-						throw new DirectoryNotFoundException(string.Format("RunDir was not found at {0} (CWD = {1})",
+						throw new DirectoryNotFoundException(string.Format(CultureInfo.InvariantCulture,
+                                                                           "The Directory {0} was not found at {1} (CWD = {2})",
+                                                                           RunDir,
 						                                                   new DirectoryInfo(RunDir).FullName,
 						                                                   new DirectoryInfo(Directory.GetCurrentDirectory()).FullName));
 					}
@@ -234,15 +237,15 @@ namespace WCell.RealmServer.Tests
 
 				if (!File.Exists(WCellRealmServerConsoleExe))
 				{
-					throw new DirectoryNotFoundException(string.Format("WCellRealmServerConsole.exe was not found at {0} (CWD = {1})",
+					throw new DirectoryNotFoundException(string.Format(CultureInfo.InvariantCulture, "WCellRealmServerConsole.exe was not found at {0} (CWD = {1})",
 						new FileInfo(WCellRealmServerConsoleExe).FullName, new DirectoryInfo(Directory.GetCurrentDirectory()).FullName));
 				}
 
 				// since console will not show, lets echo console output to a file:
-				Console.SetOut(m_output = new IndentTextWriter(LogFile) {
+				Console.SetOut(s_output = new IndentTextWriter(LogFile) {
 					AutoFlush = true
 				});
-				LogUtil.SetupStreamLogging(m_output);
+				LogUtil.SetupStreamLogging(s_output);
 
 				RealmServer.EntryLocation = WCellRealmServerConsoleExe;
 				var realmServ = RealmServer.Instance;				// make sure to create the RealmServer instance first
@@ -252,7 +255,7 @@ namespace WCell.RealmServer.Tests
 				RealmServer.ConsoleActive = false;
 				RealmServerConfiguration.ContentDirName = Path.GetFullPath(ContentDir);
 				RealmServerConfiguration.Initialize();
-				RealmAddonMgr.AddonDir = RealmAddonDir;
+				RealmAddonMgr.AddonDir = RealmAddOnDir;
 
 				DebugUtil.DumpDirName = DumpDir;
 				DebugUtil.Init();
@@ -312,6 +315,7 @@ namespace WCell.RealmServer.Tests
 
 			int count = CharacterRecord.GetCount();
 
+            //TODO: Rethink this, at least rewrite the 'production servers' testing
 			if (count > 500)
 			{
 				throw new Exception("Cannot run tests on production servers since it requires to drop the complete Database. " +
@@ -351,9 +355,9 @@ namespace WCell.RealmServer.Tests
 		}
 		#endregion
 
-		public static void WriteLine(string str, params object[] args)
+		public static void WriteLine(string line, params object[] args)
 		{
-			m_output.WriteLine(string.Format(str, args));
+			s_output.WriteLine(string.Format(CultureInfo.InvariantCulture, line, args));
 		}
 
 		/// <summary>
@@ -363,7 +367,7 @@ namespace WCell.RealmServer.Tests
 		{
 			var map = Kalimdor;
 			map.AddMessageAndWait(new Message(() => {
-				Kalimdor.AddObjectNow(obj, ref m_defaultPos);
+				Kalimdor.AddObjectNow(obj, ref s_defaultPos);
 				if (obj is Character)
 				{
 					Kalimdor.ForceUpdateCharacters();
@@ -379,6 +383,7 @@ namespace WCell.RealmServer.Tests
 		/// </summary>
 		public static void EnsureInWorld(WorldObject obj)
 		{
+            Assert.IsNotNull(obj);
 			if (!obj.IsInWorld)
 			{
 				AddToDefaultMap(obj);
@@ -387,14 +392,16 @@ namespace WCell.RealmServer.Tests
 
 		public static void WriteRamUsage(string msg, params object[] args)
 		{
+            //TODO: Rethink this. Forcing Garbage collection unnecessarily degrades performance
 			var ramBefore = GC.GetTotalMemory(false);
 			GC.Collect();
-			msg = string.Format(msg, args);
+			msg = string.Format(CultureInfo.InvariantCulture, msg, args);
 			WriteLine(msg + ": Ram usage: {0}, After collect: {1}", ramBefore, GC.GetTotalMemory(true));
 		}
 
-		static void Main(string[] args)
-		{
-		}
+        //This does not make sense here
+        //static void Main(string[] args)
+        //{
+        //}
 	}
 }

@@ -8,6 +8,7 @@ using System.Threading;
 using WCell.RealmServer.Entities;
 using WCell.Constants;
 using WCell.RealmServer.Debugging;
+using System.Globalization;
 
 namespace WCell.RealmServer.Tests
 {
@@ -15,37 +16,52 @@ namespace WCell.RealmServer.Tests
 	{
 		public static void GreaterThan(IComparable greater, IComparable smaller)
 		{
+            Assert.IsNotNull(greater);
+            Assert.IsNotNull(smaller);
 			GreaterThan(greater, smaller, "{0} is not > {1}", greater, smaller);
 		}
 
 		public static void GreaterThan(IComparable greater, IComparable smaller, string message, params object[] args)
 		{
-			Assert.IsTrue(greater.CompareTo(smaller) > 0, string.Format(message, args));
+            Assert.IsNotNull(greater);
+            Assert.IsNotNull(smaller);
+            Assert.IsTrue(greater.CompareTo(smaller) > 0, string.Format(CultureInfo.InvariantCulture, message, args));
 		}
 
 		public static void GreaterOrEqual(IComparable greater, IComparable smaller)
 		{
+            Assert.IsNotNull(greater);
+            Assert.IsNotNull(smaller);
 			GreaterOrEqual(greater, smaller, "{0} is not >= {1}", greater, smaller);
 		}
 
 		public static void GreaterOrEqual(IComparable greater, IComparable smaller, string message, params object[] args)
 		{
-			Assert.IsTrue(greater.CompareTo(smaller) >= 0, string.Format(message, args));
+            Assert.IsNotNull(greater);
+            Assert.IsNotNull(smaller);
+            Assert.IsTrue(greater.CompareTo(smaller) >= 0, string.Format(CultureInfo.InvariantCulture, message, args));
 		}
 
 
 		public static void LessOrEqual(IComparable smaller, IComparable greater)
 		{
+            Assert.IsNotNull(greater);
+            Assert.IsNotNull(smaller);
 			LessOrEqual(greater, smaller, "{0} is not <= {1}", greater, smaller);
 		}
 
 		public static void LessOrEqual(IComparable smaller, IComparable greater, string message, params object[] args)
 		{
-			Assert.IsTrue(smaller.CompareTo(greater) <= 0, string.Format(message, args));
+            Assert.IsNotNull(greater);
+            Assert.IsNotNull(smaller);
+            Assert.IsTrue(smaller.CompareTo(greater) <= 0, string.Format(CultureInfo.InvariantCulture, message, args));
 		}
 
 		public static void InBetween(IComparable min, IComparable max, IComparable value)
 		{
+            Assert.IsNotNull(min);
+            Assert.IsNotNull(max);
+            Assert.IsNotNull(value);
 			Assert.IsTrue(min.CompareTo(max) < 0, "Min ({0}) is not smaller than Max ({1})", min, max);
 			Assert.IsTrue(min.CompareTo(value) <= 0, "value ({0}) is not >= Min ({1})", value, min);
 			Assert.IsTrue(max.CompareTo(value) >= 0, "value ({0}) is not <= Max ({1})", value, max);
@@ -53,7 +69,10 @@ namespace WCell.RealmServer.Tests
 
 		public static void InBetween(IComparable min, IComparable max, IComparable value, string msg, params object[] args)
 		{
-			msg = string.Format(msg, args);
+            Assert.IsNotNull(min);
+            Assert.IsNotNull(max);
+            Assert.IsNotNull(value);
+            msg = string.Format(CultureInfo.InvariantCulture, msg, args);
 			Assert.IsTrue(min.CompareTo(value) <= 0, msg);
 			Assert.IsTrue(max.CompareTo(value) >= 0, msg);
 		}
@@ -74,8 +93,8 @@ namespace WCell.RealmServer.Tests
 		public static void FlatNotSet<T>(T value, T flag)
 			where T : struct
 		{
-			var longValue = (uint)Convert.ChangeType(value, typeof(uint));
-			var longFlag = (uint)Convert.ChangeType(flag, typeof(uint));
+            var longValue = (uint)Convert.ChangeType(value, typeof(uint), CultureInfo.InvariantCulture);
+            var longFlag = (uint)Convert.ChangeType(flag, typeof(uint), CultureInfo.InvariantCulture);
 			Assert.AreEqual((uint)0, longValue & longFlag, "Flag {0} is set in value {1}", flag, value);
 		}
 
@@ -85,9 +104,9 @@ namespace WCell.RealmServer.Tests
 		public static void FlatNotSet<T>(T value, T flag, string msg, params object[] args)
 			where T : struct
 		{
-			var longValue = (uint)Convert.ChangeType(value, typeof(uint));
-			var longFlag = (uint)Convert.ChangeType(flag, typeof(uint));
-			Assert.AreEqual((uint)0, longValue & longFlag, string.Format(msg, args));
+            var longValue = (uint)Convert.ChangeType(value, typeof(uint), CultureInfo.InvariantCulture);
+            var longFlag = (uint)Convert.ChangeType(flag, typeof(uint), CultureInfo.InvariantCulture);
+            Assert.AreEqual((uint)0, longValue & longFlag, string.Format(CultureInfo.InvariantCulture, msg, args));
 		}
 
 		/// <summary>
@@ -96,8 +115,8 @@ namespace WCell.RealmServer.Tests
 		public static void FlatIsSet<T>(T value, T flag)
 			where T : struct
 		{
-			var longValue = (uint)Convert.ChangeType(value, typeof(uint));
-			var longFlag = (uint)Convert.ChangeType(flag, typeof(uint));
+			var longValue = (uint)Convert.ChangeType(value, typeof(uint),CultureInfo.InvariantCulture);
+            var longFlag = (uint)Convert.ChangeType(flag, typeof(uint), CultureInfo.InvariantCulture);
 			Assert.AreNotEqual((uint)0, longValue & longFlag, "Flag {0} is not set in Value {1}", flag, value);
 		}
 
@@ -107,9 +126,9 @@ namespace WCell.RealmServer.Tests
 		public static void FlatIsSet<T>(T value, T flag, string msg, params object[] args)
 			where T : struct
 		{
-			var longValue = (uint)Convert.ChangeType(value, typeof(uint));
-			var longFlag = (uint)Convert.ChangeType(flag, typeof(uint));
-			Assert.AreNotEqual((uint)0, longValue & longFlag, string.Format(msg, args));
+            var longValue = (uint)Convert.ChangeType(value, typeof(uint), CultureInfo.InvariantCulture);
+            var longFlag = (uint)Convert.ChangeType(flag, typeof(uint), CultureInfo.InvariantCulture);
+			Assert.AreNotEqual((uint)0, longValue & longFlag, string.Format(CultureInfo.InvariantCulture, msg, args));
 		}
 
 		#region Maps
@@ -121,6 +140,8 @@ namespace WCell.RealmServer.Tests
 		/// <param name="newPos"></param>
 		public static void TransferObject(this Map map, WorldObject obj, Vector3 newPos, bool wait)
 		{
+            Assert.IsNotNull(map);
+            Assert.IsNotNull(obj);
 			if (obj.Map == map)
 			{
 				// already in that map
@@ -202,6 +223,7 @@ namespace WCell.RealmServer.Tests
 		/// </summary>
 		public static void EnsureInWorld(this WorldObject obj)
 		{
+            Assert.IsNotNull(obj);
 			Setup.EnsureInWorld(obj);
 			Assert.IsNotNull(obj.Map);
 			Assert.IsTrue(obj.Map.IsRunning);
@@ -212,6 +234,7 @@ namespace WCell.RealmServer.Tests
 		/// </summary>
 		public static void EnsureLiving(this Unit unit)
 		{
+            Assert.IsNotNull(unit);
 			unit.SetUInt32(UnitFields.BASE_HEALTH, 1000);
 			unit.SetUInt32(UnitFields.HEALTH, 1000);
 
@@ -226,6 +249,7 @@ namespace WCell.RealmServer.Tests
 		/// <param name="baseHealth"></param>
 		public static void EnsureHealth(this Unit unit, int baseHealth)
 		{
+            Assert.IsNotNull(unit);
 			unit.BaseHealth = baseHealth;
 			unit.Health = (int)unit.MaxHealth;
 		}
@@ -238,6 +262,7 @@ namespace WCell.RealmServer.Tests
 		/// <param name="basePower"></param>
 		public static void EnsurePower(this Unit unit, int basePower)
 		{
+            Assert.IsNotNull(unit);
 			unit.BasePower = basePower;
 			unit.Power = (int)unit.MaxPower;
 		}
@@ -247,12 +272,14 @@ namespace WCell.RealmServer.Tests
 		/// </summary>
 		public static void EnsureInWorldAndLiving(this Unit unit)
 		{
+            Assert.IsNotNull(unit);
 			unit.EnsureInWorld();
 			unit.EnsureLiving();
 		}
 
 		public static void CleanSweep(this Map map)
 		{
+            Assert.IsNotNull(map);
 			if (map.IsRunning)
 			{
 				// if already running, make sure that all other objects get removed
@@ -269,8 +296,9 @@ namespace WCell.RealmServer.Tests
 		/// <summary>
 		///  Ensures that this Character is in the world and there is no one else in the same map
 		/// </summary>
-		public static void EnsureAloneInWorld(this Unit unit)
+		public static void EnsureAloneInWorld(this WorldObject unit)
 		{
+            Assert.IsNotNull(unit);
 			if (unit.Map != null && unit.Map.IsRunning && unit.Map.ObjectCount > 1)
 			{
 				unit.Map.CleanSweep();
@@ -285,6 +313,7 @@ namespace WCell.RealmServer.Tests
 		/// </summary>
 		public static void EnsureAloneInWorldAndLiving(this Unit unit)
 		{
+            Assert.IsNotNull(unit);
 			unit.EnsureAloneInWorld();
 			unit.EnsureLiving();
 		}

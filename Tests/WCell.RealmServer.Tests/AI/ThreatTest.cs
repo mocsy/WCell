@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using WCell.RealmServer.AI;
 using WCell.RealmServer.Entities;
+using System.Globalization;
 
 namespace WCell.RealmServer.Tests.AI
 {
@@ -16,7 +17,7 @@ namespace WCell.RealmServer.Tests.AI
 			var npc = Setup.NPCPool.CreateDummy();
 			npc.EnsureInWorldAndLiving();
 			npc.IsEvading = false;
-			npc.Name = i.ToString();
+			npc.Name = i.ToString(CultureInfo.InvariantCulture);
 
 			Assert.IsTrue(npc.CanGenerateThreat);
 			return npc;
@@ -26,7 +27,7 @@ namespace WCell.RealmServer.Tests.AI
 		public void TestThreatCollection()
 		{
 			var collection = new ThreatCollection();
-
+            //TODO: Rethink this
 			var npc1 = CreateDummy(1);
 			var npc2 = CreateDummy(2);
 			var npc3 = CreateDummy(3);
