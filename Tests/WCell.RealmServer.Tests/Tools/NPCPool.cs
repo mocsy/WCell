@@ -27,8 +27,8 @@ namespace WCell.RealmServer.Tests.Tools
 			MaxHealth = 100,
 			Type = CreatureType.Beast,
 			InstanceTypeHandlers = new NPCTypeHandler[0],
-			AllianceFaction = Faction.NullFaction,
-			HordeFaction = Faction.NullFaction,
+			//AllianceFaction = Faction.NullFaction,
+			//HordeFaction = Faction.NullFaction,
 			NPCCreator = NPCEntry.DefaultCreator,
 			BrainCreator = npc => new MobBrain(npc)
 		};
@@ -41,8 +41,8 @@ namespace WCell.RealmServer.Tests.Tools
 			MaxHealth = 100,
 			Type = CreatureType.Humanoid,
 			InstanceTypeHandlers = new NPCTypeHandler[0],
-			AllianceFaction = Faction.NullFaction,
-			HordeFaction = Faction.NullFaction,
+			//AllianceFaction = Faction.NullFaction,
+			//HordeFaction = Faction.NullFaction,
 			NPCCreator = NPCEntry.DefaultCreator,
 			BrainCreator = npc => new MobBrain(npc)
 		};
