@@ -27,9 +27,13 @@ namespace WCell.Terrain.Serialization
 		/// 3: Liquids added
 		/// </summary>
 		public const int Version = 3;
+		public const int HeightfieldVersion = 1;
 
 		public const string FileTypeId = "sadt";
 		public const string FileExtension = "." + FileTypeId;
+
+		public const string HeightfieldFileTypeId = "hfadt";
+		public const string HeightfieldFileExtension = "." + HeightfieldFileTypeId;
 
 		public static string GetMapDirectory(MapId map)
 		{
@@ -42,6 +46,12 @@ namespace WCell.Terrain.Serialization
 			return Path.Combine(path, TerrainConstants.GetTileName(tileX, tileY) + FileExtension);
 		}
 
+		public static string GetHeightfieldFileName(MapId map, int tileX, int tileY)
+		{
+			var path = GetMapDirectory(map);
+			return Path.Combine(path, TerrainConstants.GetTileName(tileX, tileY) + HeightfieldFileExtension);
+		}
+
 		public static bool GetTileCoordsFromFileName(string file, out int x, out int y)
 		{
 			var ss = new StringStream(file);
@@ -51,7 +61,7 @@ namespace WCell.Terrain.Serialization
 		}
 
 		/// <summary>
-		/// Writes all height maps to the default MapDir
+		/// Writes all height maps as trimeshes and liquid information to the default MapDir
 		/// </summary>
 		//public static void WriteADTs(WDT wdt)
 		public static void WriteADT(ADT adt)
@@ -71,6 +81,7 @@ namespace WCell.Terrain.Serialization
 
 					writer.Write(adt.IsWMOOnly);
 
+					// Write heightfield trimesh
 					writer.Write(adt.TerrainVertices);
 					writer.Write(adt.TerrainIndices);
 

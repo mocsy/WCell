@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.Xna.Framework;
+using WCell.Terrain.Recast.NavMesh;
 
 namespace WCell.Terrain.GUI.Renderers
 {
@@ -24,7 +25,7 @@ namespace WCell.Terrain.GUI.Renderers
             set
             {
                 navMeshWasEnabled = value;
-                if (!Enabled) return;
+				if (!Enabled || wiredNavMesh == null) return;
 
                 wiredNavMesh.Enabled = value;
                 solidNavMesh.Enabled = value;
@@ -60,19 +61,26 @@ namespace WCell.Terrain.GUI.Renderers
         {
             environs = new EnvironmentRenderer(game, tile);
             normals = new WireframeNormalRenderer(game, environs);
-            liquids = new LiquidRenderer(game, tile);
-            solidNavMesh = new SolidNavMeshRenderer(game, tile);
-            wiredNavMesh = new WireframeNavMeshRenderer(game, tile);
+			liquids = new LiquidRenderer(game, tile);
 
-            Game.Components.Add(environs);
-            Game.Components.Add(normals);
-            Game.Components.Add(liquids);
-            Game.Components.Add(solidNavMesh);
-            Game.Components.Add(wiredNavMesh);
+			Game.Components.Add(environs);
+			Game.Components.Add(normals);
+			Game.Components.Add(liquids);
+
+			if (NavMeshBuilder.AutoLoadNavmeshes)
+			{
+				solidNavMesh = new SolidNavMeshRenderer(game, tile);
+				wiredNavMesh = new WireframeNavMeshRenderer(game, tile);
+
+				Game.Components.Add(solidNavMesh);
+				Game.Components.Add(wiredNavMesh);
+			}
             
             Disposed += (sender, args) => Cleanup();
             EnabledChanged += (sender, args) => EnabledToggled();
         }
+
+		public TerrainTile Tile { get; private set;  }
 
         private void EnabledToggled()
         {
@@ -101,8 +109,14 @@ namespace WCell.Terrain.GUI.Renderers
             environs.Dispose();
             normals.Dispose();
             liquids.Dispose();
-            wiredNavMesh.Dispose();
-            solidNavMesh.Dispose();
+			if (wiredNavMesh != null)
+			{
+				wiredNavMesh.Dispose();
+			}
+			if (solidNavMesh != null)
+			{
+				solidNavMesh.Dispose();
+			}
         }
 
         private void RemoveSubComponents()

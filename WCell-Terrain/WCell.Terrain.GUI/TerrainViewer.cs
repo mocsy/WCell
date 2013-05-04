@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -46,6 +48,8 @@ namespace WCell.Terrain.GUI
 		const float ViewAngle = MathHelper.PiOver4;
 		const float NearClip = 1.0f;
 		const float FarClip = 2000.0f;
+		private const int MaxTileCount = 300;
+
 		/// <summary>
 		/// Can't get closer than this to any object.
 		/// Must be > ForwardSpeed
@@ -57,7 +61,8 @@ namespace WCell.Terrain.GUI
 		public static float MouseSensitivity = 3;
 
 		//float ForwardSpeed = 50f / 60f;
-		float ForwardSpeed = 1.2f;
+		//float ForwardSpeed = 1.2f;
+		float ForwardSpeed = 30f;
 
 
 		// XNA uses this variable for graphics information
@@ -105,7 +110,7 @@ namespace WCell.Terrain.GUI
 	    private AxisRenderer AxisRenderer;
 		private float globalIlluminationLevel;
 	    private World world;
-	    private SimpleWDTTerrain activeTerrain;
+	    private Terrain activeTerrain;
 		private List<TerrainTile> m_Tiles;
 
 		/// <summary>
@@ -123,11 +128,14 @@ namespace WCell.Terrain.GUI
 			Form = (Form)Control.FromHandle(Window.Handle);
 
 		    this.world = world;
-		    activeTerrain = (SimpleWDTTerrain)world.WorldTerrain[tileId.MapId];
-		    var tile = activeTerrain.Tiles[tileId.X, tileId.Y];
-		    ActiveTile = tile;
-            m_Tiles = new List<TerrainTile> { tile };
-            TileRenderers = new Dictionary<TileIdentifier, TileRenderer>((int)MapId.End);
+
+			m_Tiles = new List<TerrainTile>();
+			TileRenderers = new Dictionary<TileIdentifier, TileRenderer>((int)MapId.End);
+
+			if (world.WorldTerrain.TryGetValue(tileId.MapId, out activeTerrain))
+			{
+				InitialTile = activeTerrain.Tiles[tileId.X, tileId.Y];
+			}
 		}
 
 		#region Properties
@@ -158,13 +166,20 @@ namespace WCell.Terrain.GUI
                 var retList = new List<IShape>(m_Tiles.Count);
                 foreach (var tile in m_Tiles)
                 {
-                    retList.Add(tile.NavMesh);
+					if (tile.NavMesh != null)
+					{
+						retList.Add(tile.NavMesh);
+					}
                 }
                 return retList;
             }
 		}
 
-        public TerrainTile ActiveTile { get; private set; }
+		/// <summary>
+		/// The tile to be displayed first.
+		/// TODO: Remove this thing.
+		/// </summary>
+        public TerrainTile InitialTile { get; private set; }
 
 		/// <summary>
 		/// The form of this application
@@ -231,15 +246,17 @@ namespace WCell.Terrain.GUI
 
 			effect = new BasicEffect(_graphics.GraphicsDevice);
             InitializeEffect();
-
-
+			
 			Components.Add(AxisRenderer = new AxisRenderer(this));
             Components.Add(TriangleSelectionRenderer = new GenericRenderer(this));
 			Components.Add(LineSelectionRenderer = new GenericRenderer(this));
 
-		    var tileRenderer = new TileRenderer(this, ActiveTile);
-            TileRenderers.Add(ActiveTile.TileId, tileRenderer);
-            Components.Add(tileRenderer);
+			// Add Active tile to display
+			DisplayTile(InitialTile);
+
+			// Add a whole bunch more tiles to display
+			var tile = InitialTile;
+			LoadAndDisplayNeighbors(tile);
 
 			InitGUI();
 
@@ -338,7 +355,8 @@ namespace WCell.Terrain.GUI
 
 		private void RecenterMouse()
 		{
-            if (!Form.Focused || !IsActive) return;
+            //if (!Form.Focused || !IsActive) return;
+			if (!IsActive) return;
 
             var bounds = Window.ClientBounds;
             var x = Mouse.GetState().X;
@@ -923,6 +941,9 @@ namespace WCell.Terrain.GUI
 		readonly BackgroundWorker worker = new BackgroundWorker();
 
 		private TextBox LiquidBox;
+
+		private List<Control> menuControls;
+		private TileOverview tileOverview;
 	    private Button NorthWestButton;
 	    private Button NorthButton;
 	    private Button NorthEastButton;
@@ -943,7 +964,7 @@ namespace WCell.Terrain.GUI
 				if (value == IsMenuVisible) return;
 
 				SetTreeViewVisible(value);
-			    SetButtonsVisible(value);
+			    SetMenuControlsVisible(value);
 				if (value)
 				{
 					Form.Menu = menu;
@@ -975,25 +996,13 @@ namespace WCell.Terrain.GUI
 			treeView.Visible = value;
 		}
 
-        private void SetButtonsVisible(bool value)
+        private void SetMenuControlsVisible(bool value)
         {
-            if (NorthWestButton.Parent == null) Form.Controls.Add(NorthWestButton);
-            if (NorthButton.Parent == null) Form.Controls.Add(NorthButton);
-            if (NorthEastButton.Parent == null) Form.Controls.Add(NorthEastButton);
-            if (EastButton.Parent == null) Form.Controls.Add(EastButton);
-            if (SouthEastButton.Parent == null) Form.Controls.Add(SouthEastButton);
-            if (SouthButton.Parent == null) Form.Controls.Add(SouthButton);
-            if (SouthWestButton.Parent == null) Form.Controls.Add(SouthWestButton);
-            if (WestButton.Parent == null) Form.Controls.Add(WestButton);
-            
-            NorthWestButton.Visible = value;
-            NorthButton.Visible = value;
-            NorthEastButton.Visible = value;
-            EastButton.Visible = value;
-            SouthEastButton.Visible = value;
-            SouthButton.Visible = value;
-            SouthWestButton.Visible = value;
-            WestButton.Visible = value;
+			foreach (var ctrl in menuControls)
+			{
+				if (ctrl.Parent == null) Form.Controls.Add(ctrl);
+				ctrl.Visible = value;
+			}
         }
 
 		/// <summary>
@@ -1015,26 +1024,31 @@ namespace WCell.Terrain.GUI
 		    TextBoxUtil.DisableDecoration(LiquidBox);
 		    Form.Controls.Add(LiquidBox);
 
+			menuControls = new List<Control>();
+
 		    NorthWestButton = new DirectionButton(Point2D.NorthWest)
 		    {
 		        Text = "NorthWest",
 		        Location = new Point(10, 10)
 		    };
 		    NorthWestButton.Click += ClickedDirectionButton;
+			menuControls.Add(NorthWestButton);
 
 		    NorthButton = new DirectionButton(Point2D.North)
 		    {
 		        Text = "North"
 		    };
 		    NorthButton.Location = new Point((Form.Width - NorthButton.Size.Width)/2, 10);
-		    NorthButton.Click += ClickedDirectionButton;
+			NorthButton.Click += ClickedDirectionButton;
+			menuControls.Add(NorthButton);
 
 		    NorthEastButton = new DirectionButton(Point2D.NorthEast)
 		    {
 		        Text = "NorthEast"
 		    };
 		    NorthEastButton.Location = new Point(Form.Width - NorthEastButton.Size.Width - 10, 10);
-		    NorthEastButton.Click += ClickedDirectionButton;
+			NorthEastButton.Click += ClickedDirectionButton;
+			menuControls.Add(NorthEastButton);
 
 		    EastButton = new DirectionButton(Point2D.East)
 		    {
@@ -1042,7 +1056,8 @@ namespace WCell.Terrain.GUI
 		    };
 		    EastButton.Location = new Point(Form.Width - EastButton.Size.Width - 10,
 		                                    (Form.Height - EastButton.Size.Height)/2);
-		    EastButton.Click += ClickedDirectionButton;
+			EastButton.Click += ClickedDirectionButton;
+			menuControls.Add(EastButton);
 
 		    SouthEastButton = new DirectionButton(Point2D.SouthEast)
 		    {
@@ -1050,7 +1065,8 @@ namespace WCell.Terrain.GUI
 		    };
 		    SouthEastButton.Location = new Point(Form.Width - SouthEastButton.Size.Width - 10,
 		                                         Form.Height - SouthEastButton.Size.Height - 75);
-		    SouthEastButton.Click += ClickedDirectionButton;
+			SouthEastButton.Click += ClickedDirectionButton;
+			menuControls.Add(SouthEastButton);
 
 		    SouthButton = new DirectionButton(Point2D.South)
 		    {
@@ -1058,22 +1074,27 @@ namespace WCell.Terrain.GUI
 		    };
 		    SouthButton.Location = new Point((Form.Width - SouthButton.Size.Width)/2,
 		                                     Form.Height - SouthButton.Size.Height - 75);
-		    SouthButton.Click += ClickedDirectionButton;
+			SouthButton.Click += ClickedDirectionButton;
+			menuControls.Add(SouthButton);
 
 		    SouthWestButton = new DirectionButton(Point2D.SouthWest)
 		    {
 		        Text = "SouthWest"
 		    };
 		    SouthWestButton.Location = new Point(10, Form.Height - SouthWestButton.Size.Height - 75);
-		    SouthWestButton.Click += ClickedDirectionButton;
+			SouthWestButton.Click += ClickedDirectionButton;
+			menuControls.Add(SouthWestButton);
 
 		    WestButton = new DirectionButton(Point2D.West)
 		    {
 		        Text = "West"
 		    };
 		    WestButton.Location = new Point(10, (Form.Height - WestButton.Size.Height)/2);
-		    WestButton.Click += ClickedDirectionButton;
+			WestButton.Click += ClickedDirectionButton;
+			menuControls.Add(WestButton);
 
+
+			// Create menu
 		    menu = new MainMenu();
 
 			renderingModeButton = new MenuItem();
@@ -1089,13 +1110,23 @@ namespace WCell.Terrain.GUI
 		    toggleNavMeshButton = new MenuItem();
 		    toggleNavMeshButton.Click += ClickedToggleNavMeshButton;
 		    menu.MenuItems.Add(toggleNavMeshButton);
-		    ClickedToggleNavMeshButton(null, null);
+			ClickedToggleNavMeshButton(null, null);
+
+			// Create TileOverview
+			tileOverview = new TileOverview();
+			//tileOverview.Dock = DockStyle.Left;
+			tileOverview.InitImage(InitialTile.Map);
+			var pos = Form.ClientSize - tileOverview.Image.Size;
+			tileOverview.Location = new Point(pos.Width/2, pos.Height/2);
+			tileOverview.Size = tileOverview.Image.Size;
+			menuControls.Add(tileOverview);
+
 
 			//var exportRecastMeshButton = new MenuItem("Export Tile mesh");
 			//exportRecastMeshButton.Click += ExportRecastMesh;
 			//menu.MenuItems.Add(exportRecastMeshButton);
 
-			// build treeview asynchronously
+			// Build treeview asynchronously
 		    treeView = new TreeView
 		    {
 		        Dock = DockStyle.Left
@@ -1103,13 +1134,16 @@ namespace WCell.Terrain.GUI
 		    treeView.DoubleClick += DoubleClickedTreeView;
 			treeView.Width = 200;
 
-			GetOrCreateWaitingBox("Loading zone list...").Visible = true;
-			worker.DoWork += DoBuildTreeView;
-			worker.RunWorkerCompleted += OnTreeViewBuilt;
+			if (Tiles.Count > 0)
+			{
+				GetOrCreateWaitingBox("Loading zone list...").Visible = true;
+				worker.DoWork += DoBuildTreeView;
+				worker.RunWorkerCompleted += OnTreeViewBuilt;
 
-			worker.RunWorkerAsync();
+				worker.RunWorkerAsync();
+			}
 
-            UpdateFormText();
+			UpdateFormText();
 		}
 
 		void DoBuildTreeView(object sender, DoWorkEventArgs e)
@@ -1195,50 +1229,49 @@ namespace WCell.Terrain.GUI
 
         private void ClickedToggleWaterButton(object sender, EventArgs e)
         {
-            liquidRenderingEnabled = !liquidRenderingEnabled;
+        	liquidRenderingEnabled = !liquidRenderingEnabled;
+        	foreach (var renderer in TileRenderers.Values)
+        	{
+        		renderer.LiquidEnabled = liquidRenderingEnabled;
+        	}
 
-            foreach (var renderer in TileRenderers.Values)
-            {
-                renderer.LiquidEnabled = liquidRenderingEnabled;
-            }
-            
-            if (liquidRenderingEnabled)
-            {
-                toggleWaterButton.Text = "Water Off";
-            }
-            else
-            {
-                toggleWaterButton.Text = "Water On";
-            }
+        	if (liquidRenderingEnabled)
+        	{
+        		toggleWaterButton.Text = "Water Off";
+        	}
+        	else
+        	{
+        		toggleWaterButton.Text = "Water On";
+        	}
         }
 
-        private void ClickedToggleNavMeshButton(object sender, EventArgs e)
-        {
-            navMeshRenderingEnabled = !navMeshRenderingEnabled;
-            foreach (var renderer in TileRenderers.Values)
-            {
-                renderer.NavMeshEnabled = navMeshRenderingEnabled;
-            }
+		private void ClickedToggleNavMeshButton(object sender, EventArgs e)
+		{
+			navMeshRenderingEnabled = !navMeshRenderingEnabled;
+			foreach (var renderer in TileRenderers.Values)
+			{
+				renderer.NavMeshEnabled = navMeshRenderingEnabled;
+			}
 
-            if (navMeshRenderingEnabled)
-            {
-                toggleNavMeshButton.Text = "NavMesh Off";
-            }
-            else
-            {
-                toggleNavMeshButton.Text = "NavMesh On";
-            }
-        }
+			if (navMeshRenderingEnabled)
+			{
+				toggleNavMeshButton.Text = "NavMesh Off";
+			}
+			else
+			{
+				toggleNavMeshButton.Text = "NavMesh On";
+			}
+		}
 
-        private void ClickedDirectionButton(object sender, EventArgs e)
-        {
-            var button = (DirectionButton)sender;
+		private void ClickedDirectionButton(object sender, EventArgs e)
+		{
+			var button = (DirectionButton)sender;
 
-            var tile = ActiveTile;
+            var tile = InitialTile;
             if (tile == null) return;
 
             var newCoords = tile.Coords + button.Direction;
-            ToggleDisplayedTile(activeTerrain.MapId, newCoords);
+            ToggleTileDisplay(activeTerrain.MapId, newCoords, false);
         }
 
         private Control GetOrCreateWaitingBox(string text)
@@ -1265,37 +1298,48 @@ namespace WCell.Terrain.GUI
             
             var tnode = node as TileTreeNode;
 
-		    tnode.BackColor = (!ToggleDisplayedTile(tnode.Map, tnode.Coords))
+		    tnode.BackColor = (!ToggleTileDisplay(tnode.Map, tnode.Coords, true))
 		                          ? TileTreeNode.NotLoadedColor
 		                          : TileTreeNode.LoadedColor;
 		}
 
 	    private DoWorkEventHandler addingTile;
 	    private RunWorkerCompletedEventHandler completedLoad;
-	    private bool ToggleDisplayedTile(MapId map, Point2D coords)
+	    private bool ToggleTileDisplay(MapId map, Point2D coords, bool move)
 	    {
 	        var tileId = new TileIdentifier(map, coords);
             if (TileRenderers.ContainsKey(tileId))
             {
-                RemoveTileFromDisplay(tileId);
+				RemoveTileFromDisplay(tileId);
+				UpdateTerrainViewer(false);
                 IsMenuVisible = false;
                 return false;
             }
             
-	        // GUI stuff
+
+	        // GUI stuff & background loader
             if (worker.IsBusy) return false;
             
             IsMenuVisible = false;
             GetOrCreateWaitingBox("Loading tile - Please wait...").Visible = true;
 	        
-            addingTile = (sender, b) =>  AddTileToDisplay(tileId);
+            addingTile = (sender, b) => b.Result = LoadAndDisplayTile(tileId, move);
             worker.DoWork += addingTile;
 
-	        completedLoad = (sender, e) =>
+	        completedLoad = (sender, args) =>
 	        {
+				// type: RunWorkerCompletedEventArgs
+	        	var tile = (TerrainTile)args.Result;
 	            UpdateTerrainViewer(false);
 	            worker.DoWork -= addingTile;
 	            worker.RunWorkerCompleted -= completedLoad;
+
+				if (move)
+				{
+					avatarPosition = new WVector3(TerrainConstants.CenterPoint - (tile.TileX + 1) * TerrainConstants.TileSize,
+												 TerrainConstants.CenterPoint - (tile.TileY) * TerrainConstants.TileSize,
+												 100.0f).ToXna();
+				}
 	        };
 	        worker.RunWorkerCompleted += completedLoad;
 
@@ -1305,13 +1349,13 @@ namespace WCell.Terrain.GUI
 
         private void SetEnvironmentVisibility(bool visible)
         {
-            foreach (var renderer in TileRenderers.Values)
-            {
-                renderer.EnvironsEnabled = visible;
-            }
+        	foreach (var renderer in TileRenderers.Values)
+        	{
+        		renderer.EnvironsEnabled = visible;
+        	}
         }
 
-	    class TransparentTextBox : TextBox
+		class TransparentTextBox : TextBox
 		{
 			public TransparentTextBox()
 			{
@@ -1387,18 +1431,55 @@ namespace WCell.Terrain.GUI
 			}
 		}
 
-        private void AddTileToDisplay(TileIdentifier tileId)
-        {
-            var terrain = world.GetOrLoadSimpleWDTTerrain(tileId.MapId);
-            var tile = terrain.GetOrCreateTile(tileId);
-            if (tile == null) return;
+		private TerrainTile LoadAndDisplayTile(TileIdentifier tileId, bool loadNeis)
+		{
+			while (m_Tiles.Count > MaxTileCount)
+			{
+				// Can't display too many tiles at once due to memory limitations
 
+				// Remove renderer from Components and tile from tiles
+				RemoveTileFromDisplay(m_Tiles[0].TileId);
+			}
+
+			var terrain = world.GetOrLoadSimpleWDTTerrain(tileId.MapId);
+			var tile = terrain.GetOrCreateTile(tileId);
+			Form.Invoke(new Action(() => DisplayTile(tile)));
+			if (loadNeis && tile != null)
+			{
+				LoadAndDisplayNeighbors(tile);
+			}
+			return tile;
+		}
+
+		private void LoadAndDisplayNeighbors(TerrainTile tile, int radius = 4)
+		{
+			for (var y = tile.TileY - radius; y < tile.TileY + radius; ++y)
+			{
+				for (var x = tile.TileX - radius; x < tile.TileX + radius; ++x)
+				{
+					var id = new TileIdentifier(tile.TileId, x, y);
+
+					LoadAndDisplayTile(id, false);
+				}
+			}
+		}
+
+		public void DisplayTile(TerrainTile tile)
+        {
+			if (TileRenderers.ContainsKey(tile.TileId)) return;		// already loaded
+			
             var renderer = new TileRenderer(this, tile);
             renderer.LiquidEnabled = liquidRenderingEnabled;
             renderer.NavMeshEnabled = navMeshRenderingEnabled;
-            TileRenderers.Add(tileId, renderer);
+			TileRenderers.Add(tile.TileId, renderer);
             Tiles.Add(tile);
             Components.Add(renderer);
+
+			if (tile.Map != activeTerrain.MapId)
+			{
+				activeTerrain = tile.Terrain;
+				tileOverview.InitImage(tile.Map);
+			}
         }
 
         private void RemoveTileFromDisplay(TileIdentifier tileId)
@@ -1409,8 +1490,6 @@ namespace WCell.Terrain.GUI
             Components.Remove(renderer);
             
             renderer.Dispose();
-
-            UpdateTerrainViewer(false);
         }
 
         private void UpdateTerrainViewer(bool updateAvatar)
@@ -1426,18 +1505,18 @@ namespace WCell.Terrain.GUI
 
         private void UpdateFormText()
         {
-            var titleString = "TerrainViewer - ";
-            foreach (var tile in m_Tiles)
-            {
-                titleString += string.Format("{0} (Tile X={1}, Y={2}, ",
-                                    tile.Terrain.MapId, tile.TileX, tile.TileY);
-            }
-            titleString = titleString.TrimEnd(", ".ToCharArray());
-            titleString += ")";
-            Form.Text = titleString;
+        	var titleString = "TerrainViewer - ";
+        	foreach (var tile in m_Tiles)
+        	{
+        		titleString += string.Format("{0} (Tile X={1}, Y={2}, ",
+        		                             tile.Terrain.MapId, tile.TileX, tile.TileY);
+        	}
+        	titleString = titleString.TrimEnd(", ".ToCharArray());
+        	titleString += ")";
+        	Form.Text = titleString;
         }
 
-        private void UpdateDirectionButtonPositions()
+		private void UpdateDirectionButtonPositions()
         {
             Form.Controls.Remove(NorthWestButton);
             Form.Controls.Remove(NorthButton);
@@ -1457,7 +1536,7 @@ namespace WCell.Terrain.GUI
             Form.Controls.Add(SouthWestButton);           
             Form.Controls.Add(WestButton);
 
-            SetButtonsVisible(IsMenuVisible);
+            SetMenuControlsVisible(IsMenuVisible);
         }
 
 	    #endregion
